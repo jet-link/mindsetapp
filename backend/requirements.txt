@@ -1,0 +1,23 @@
+# --- Core ---
+Django>=5.2,<6
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.4
+drf-spectacular>=0.28
+django-cors-headers>=4.6
+
+# --- Auth (social: Google/Apple подключаем позже через allauth) ---
+django-allauth[socialaccount]>=65,<66
+
+# --- DB / Cache / Queue ---
+psycopg[binary]>=3.2
+redis>=5.0
+django-redis>=5.4
+celery>=5.4
+
+# --- Content pipeline ---
+bleach>=6.0
+Pillow>=10.0
+
+# --- Tooling ---
+python-dotenv>=1.0
+gunicorn>=22.0

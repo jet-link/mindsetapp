@@ -1,0 +1,69 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { FOLLOW_EVENT, FollowChangedDetail, getProfile } from "@/lib/api";
+
+export default function ProfileStats({
+  username,
+  followers,
+  following,
+}: {
+  username: string;
+  followers: number;
+  following: number;
+}) {
+  const [followersCount, setFollowersCount] = useState(followers);
+  const [followingCount, setFollowingCount] = useState(following);
+
+  useEffect(() => {
+    async function refresh() {
+      try {
+        const p = await getProfile(username);
+        setFollowersCount(p.followers_count);
+        setFollowingCount(p.following_count);
+      } catch {
+        // профиль недоступен — оставляем SSR-значения
+      }
+    }
+    refresh();
+
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) refresh();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [username]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<FollowChangedDetail>).detail;
+      if (!detail) return;
+      if (detail.profileUsername === username && detail.followers_count !== undefined) {
+        setFollowersCount(detail.followers_count);
+      }
+      const me = localStorage.getItem("mindset_username");
+      if (
+        me === username &&
+        detail.viewerUsername === me &&
+        detail.viewer_following_count !== undefined
+      ) {
+        setFollowingCount(detail.viewer_following_count);
+      }
+    };
+    window.addEventListener(FOLLOW_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_EVENT, handler);
+  }, [username]);
+
+  return (
+    <div className="stats">
+      <Link href={`/u/${username}/followers`} className="stat-link">
+        {followersCount} followers
+      </Link>
+      <span className="stat-sep"> · </span>
+      <Link href={`/u/${username}/following`} className="stat-link">
+        {followingCount} following
+      </Link>
+    </div>
+  );
+}

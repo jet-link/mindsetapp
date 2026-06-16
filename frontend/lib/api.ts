@@ -1,0 +1,579 @@
+// Тонкий клиент к Mindset API. Типы потом сгенерируем из OpenAPI-схемы
+// (drf-spectacular: /api/schema/), пока описаны вручную.
+
+import {
+  prependThemeToFeedCache,
+  updateAuthorAvatarInFeedCache,
+  updateThemeRepliesInFeedCache,
+  updateThemeLikeInFeedCache,
+  updateThemeRepostInFeedCache,
+  clearFeedCache,
+} from "./feed-cache";
+import { clearProfileTabsCache, updateThemeLikeInProfileCache, updateThemeRepostInProfileCache } from "./profile-tabs-cache";
+import { setUserAvatarOverride } from "./user-avatar-store";
+
+export interface UserPublic {
+  id: number;
+  username: string;
+  avatar: string | null;
+  bio: string;
+  is_following?: boolean;
+}
+
+export interface UserProfile extends UserPublic {
+  followers_count: number;
+  following_count: number;
+  themes_count: number;
+  replies_count: number;
+  media_count: number;
+  reposts_count: number;
+  date_joined: string;
+  is_following: boolean;
+}
+
+export interface ThemeImage {
+  id: number;
+  url: string;
+  thumbnail_url: string;
+  medium_url: string;
+  srcset: string;
+  width: number | null;
+  height: number | null;
+  orientation_kind: string;
+  sort_order: number;
+}
+
+export interface Hashtag {
+  name: string;
+  slug: string;
+  themes_count: number;
+}
+
+export interface Theme {
+  id: number;
+  author: UserPublic;
+  body: string;
+  body_text: string;
+  preview: string;
+  images: ThemeImage[];
+  hashtags: Hashtag[];
+  replies_count: number;
+  likes_count: number;
+  reposts_count: number;
+  shares_count: number;
+  is_liked: boolean;
+  is_reposted: boolean;
+  is_shared: boolean;
+  created_at: string;
+  human_published: string;
+  is_editable: boolean;
+}
+
+export interface Reply {
+  id: number;
+  theme_id: number;
+  parent_id: number | null;
+  author: UserPublic;
+  body: string;
+  replies_count: number;
+  likes_count: number;
+  reposts_count: number;
+  is_liked: boolean;
+  is_reposted: boolean;
+  created_at: string;
+  human_published: string;
+}
+
+export interface ProfileReply extends Reply {
+  theme: Theme;
+}
+
+export interface CursorPage<T> {
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+const isServer = typeof window === "undefined";
+
+function apiBase(): string {
+  // На сервере (SSR) ходим напрямую в Django, в браузере — через rewrite-прокси.
+  return isServer ? process.env.API_ORIGIN ?? "http://127.0.0.1:8000" : "";
+}
+
+function authHeaders(): Record<string, string> {
+  if (isServer) return {};
+  const token = localStorage.getItem("mindset_access");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function humanizeApiError(status: number, rawBody: string): string {
+  // DRF отдает JSON с деталями; HTML-страницы ошибок Django не показываем.
+  try {
+    const data = JSON.parse(rawBody);
+    if (typeof data.detail === "string") return data.detail;
+    // Ошибки валидации вида {"field": ["msg", ...]}
+    const parts: string[] = [];
+    for (const [field, msgs] of Object.entries(data)) {
+      const text = Array.isArray(msgs) ? msgs.join(" ") : String(msgs);
+      parts.push(field === "non_field_errors" ? text : `${field}: ${text}`);
+    }
+    if (parts.length) return parts.join("\n");
+  } catch {
+    // не JSON — отдаем общее сообщение ниже
+  }
+  if (status === 401) return "You need to log in.";
+  if (status === 403) return "You don't have permission to do that.";
+  return `Server error (${status}). Please try again.`;
+}
+
+// Один общий refresh на все параллельные запросы, чтобы не дергать
+// /token/refresh/ многократно при пачке одновременных 401.
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (isServer) return false;
+  const refresh = localStorage.getItem("mindset_refresh");
+  if (!refresh) return false;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/auth/token/refresh/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh }),
+          cache: "no-store",
+        });
+        if (!res.ok) return false;
+        const data = (await res.json()) as { access?: string; refresh?: string };
+        if (data.access) localStorage.setItem("mindset_access", data.access);
+        // ROTATE_REFRESH_TOKENS=True — сохраняем новый refresh-токен
+        if (data.refresh) localStorage.setItem("mindset_refresh", data.refresh);
+        return !!data.access;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+function accessTokenExpired(): boolean {
+  if (isServer) return false;
+  const token = localStorage.getItem("mindset_access");
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1])) as { exp?: number };
+    if (!payload.exp) return true;
+    return payload.exp * 1000 < Date.now() + 10_000;
+  } catch {
+    return true;
+  }
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  retry = true,
+): Promise<T> {
+  // Не отправляем протухший access-токен — иначе публичные GET
+  // получают 401 и сыпятся ошибки в консоль.
+  if (!isServer && !path.includes("/auth/token") && accessTokenExpired()) {
+    await refreshAccessToken();
+  }
+
+  const res = await fetch(`${apiBase()}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...init.headers,
+    },
+    cache: "no-store",
+  });
+
+  const isAuthCall = path.includes("/auth/token");
+  if (res.status === 401 && retry && !isServer && !isAuthCall) {
+    const ok = await refreshAccessToken();
+    if (ok) return apiFetch<T>(path, init, false);
+    const method = (init.method ?? "GET").toUpperCase();
+    if (method === "GET") {
+      const anon = await fetch(`${apiBase()}${path}`, {
+        ...init,
+        method,
+        headers: { "Content-Type": "application/json", ...init.headers },
+        cache: "no-store",
+        signal: init.signal,
+      });
+      if (anon.ok) return anon.json() as Promise<T>;
+    }
+    logout();
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(humanizeApiError(res.status, body));
+  }
+  return res.json() as Promise<T>;
+}
+
+/** Есть ли сохраненный JWT (только в браузере). */
+export function isLoggedIn(): boolean {
+  return typeof window !== "undefined" && !!localStorage.getItem("mindset_access");
+}
+
+export function logout() {
+  localStorage.removeItem("mindset_access");
+  localStorage.removeItem("mindset_refresh");
+  localStorage.removeItem("mindset_username");
+  clearFeedCache();
+  clearProfileTabsCache();
+  emitAuthChanged();
+}
+
+// --- Auth ---
+// Событие для компонентов (например, шапки), реагирующих на вход/выход
+// без перезагрузки страницы.
+export const AUTH_EVENT = "mindset-auth";
+
+function emitAuthChanged() {
+  window.dispatchEvent(new Event(AUTH_EVENT));
+}
+
+export async function login(username: string, password: string) {
+  const data = await apiFetch<{ access: string; refresh: string }>(
+    "/api/v1/auth/token/",
+    { method: "POST", body: JSON.stringify({ username, password }) },
+  );
+  localStorage.setItem("mindset_access", data.access);
+  localStorage.setItem("mindset_refresh", data.refresh);
+  localStorage.setItem("mindset_username", username);
+  clearFeedCache();
+  clearProfileTabsCache();
+  emitAuthChanged();
+  return data;
+}
+
+export async function register(username: string, email: string, password: string) {
+  return apiFetch("/api/v1/auth/register/", {
+    method: "POST",
+    body: JSON.stringify({ username, email, password }),
+  });
+}
+
+// --- Feed / Themes ---
+export type FeedTab = "main" | "my" | "for-you" | "following" | "liked";
+
+export const getFeed = (
+  tab: FeedTab,
+  cursor?: string,
+  q?: string,
+  signal?: AbortSignal,
+) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/feed/?tab=${tab}` +
+      `${q ? `&q=${encodeURIComponent(q)}` : ""}` +
+      `${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    { signal },
+  );
+
+export const getThread = (id: number | string) =>
+  apiFetch<{ theme: Theme; replies: Reply[] }>(`/api/v1/themes/${id}/`);
+
+export const getReplyDetail = (id: number | string) =>
+  apiFetch<{ reply: Reply; replies: Reply[] }>(`/api/v1/replies/${id}/`);
+
+export const createTheme = (body: string) =>
+  apiFetch<Theme>("/api/v1/themes/", { method: "POST", body: JSON.stringify({ body }) });
+
+export const toggleLike = (themeId: number) =>
+  apiFetch<{ liked: boolean; likes_count: number }>(
+    `/api/v1/themes/${themeId}/like/`, { method: "POST" });
+
+export const toggleRepost = (themeId: number) =>
+  apiFetch<{ reposted: boolean; reposts_count: number }>(
+    `/api/v1/themes/${themeId}/repost/`, { method: "POST" });
+
+export const shareTheme = (themeId: number) =>
+  apiFetch<{ shared: boolean; shares_count: number }>(
+    `/api/v1/themes/${themeId}/share/`, { method: "POST" });
+
+export interface CreateReplyResponse extends Reply {
+  theme_replies_count: number;
+  parent_replies_count?: number;
+}
+
+export const createReply = (themeId: number, body: string, parentId?: number) =>
+  apiFetch<CreateReplyResponse>(`/api/v1/themes/${themeId}/replies/`, {
+    method: "POST",
+    body: JSON.stringify({ body, parent_id: parentId ?? null }),
+  });
+
+export const toggleReplyLike = (replyId: number) =>
+  apiFetch<{ liked: boolean; likes_count: number }>(
+    `/api/v1/replies/${replyId}/like/`, { method: "POST" });
+
+export const toggleReplyRepost = (replyId: number) =>
+  apiFetch<{ reposted: boolean; reposts_count: number }>(
+    `/api/v1/replies/${replyId}/repost/`, { method: "POST" });
+
+// --- Users / Tags ---
+export const getProfile = (username: string) =>
+  apiFetch<UserProfile>(`/api/v1/users/${encodeURIComponent(username)}/`);
+
+export const getUserThemes = (username: string, cursor?: string) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/users/${encodeURIComponent(username)}/themes/${buildQuery({ cursor })}`,
+  );
+
+export const getUserReposts = (username: string, cursor?: string) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/users/${encodeURIComponent(username)}/reposts/${buildQuery({ cursor })}`,
+  );
+
+export const getUserReplies = (username: string, cursor?: string) =>
+  apiFetch<CursorPage<ProfileReply>>(
+    `/api/v1/users/${encodeURIComponent(username)}/replies/${buildQuery({ cursor })}`,
+  );
+
+export const getUserMedia = (username: string, cursor?: string) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/users/${encodeURIComponent(username)}/media/${buildQuery({ cursor })}`,
+  );
+
+/**
+ * Счетчики под темами: до 9999 — как есть, дальше 10k, 11k … 999k, 1m …
+ */
+export function formatCount(n: number): string {
+  if (n < 10_000) return String(n);
+  if (n < 1_000_000) return `${Math.floor(n / 1_000)}k`;
+  if (n < 1_000_000_000) return `${Math.floor(n / 1_000_000)}m`;
+  return `${Math.floor(n / 1_000_000_000)}b`;
+}
+
+export const toggleFollow = (username: string) =>
+  apiFetch<{ following: boolean; followers_count: number; following_count: number }>(
+    `/api/v1/users/${encodeURIComponent(username)}/follow/`, { method: "POST" });
+
+// Событие для мгновенного обновления счетчиков подписчиков на открытых
+// страницах профиля без перезагрузки.
+export const FOLLOW_EVENT = "mindset-follow";
+
+export interface FollowChangedDetail {
+  profileUsername: string;
+  followers_count?: number;
+  viewerUsername?: string;
+  viewer_following_count?: number;
+}
+
+export function emitFollowChanged(detail: FollowChangedDetail) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
+  }
+}
+
+export const getFollowers = (username: string, cursor?: string, q?: string) =>
+  apiFetch<CursorPage<UserPublic>>(
+    `/api/v1/users/${encodeURIComponent(username)}/followers/` +
+      buildQuery({ cursor, q }),
+  );
+
+export const getFollowing = (username: string, cursor?: string, q?: string) =>
+  apiFetch<CursorPage<UserPublic>>(
+    `/api/v1/users/${encodeURIComponent(username)}/following/` +
+      buildQuery({ cursor, q }),
+  );
+
+function buildQuery(params: Record<string, string | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `?${qs}` : "";
+}
+
+// --- Notifications ---
+export interface NotificationItem {
+  id: number;
+  actor: UserPublic;
+  verb: "reply" | "repost";
+  theme_id: number | null;
+  reply_id: number | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const NOTIFICATION_EVENT = "mindset-notifications";
+
+export function emitNotificationsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(NOTIFICATION_EVENT));
+  }
+}
+
+export const getNotifications = (cursor?: string) =>
+  apiFetch<CursorPage<NotificationItem>>(
+    `/api/v1/notifications/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
+
+export const getUnreadNotificationsCount = () =>
+  apiFetch<{ unread_count: number }>("/api/v1/notifications/unread/");
+
+export const markAllNotificationsRead = () =>
+  apiFetch<{ marked_read: number }>("/api/v1/notifications/read/", { method: "POST" });
+
+export const clearNotifications = () =>
+  apiFetch<{ deleted: number }>("/api/v1/notifications/clear/", { method: "POST" });
+
+// --- Search ---
+export const searchUsers = (q: string, cursor?: string, signal?: AbortSignal) =>
+  apiFetch<CursorPage<UserPublic>>(
+    `/api/v1/users/search/${buildQuery({ q, cursor })}`,
+    { signal },
+  );
+
+export const searchMentionUsers = (q: string, signal?: AbortSignal) =>
+  apiFetch<CursorPage<UserPublic>>(
+    `/api/v1/users/search/${buildQuery({ q, username_only: "1" })}`,
+    { signal },
+  );
+
+export const getPopularSearches = () =>
+  apiFetch<{ themes: string[]; users: string[] }>("/api/v1/search/popular/");
+
+export const getTagThemes = (slug: string, cursor?: string) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/tags/${encodeURIComponent(slug)}/themes/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
+
+// --- Me (profile edit) ---
+export interface MeProfile {
+  id: number;
+  username: string;
+  email: string;
+  avatar: string | null;
+  bio: string;
+  followers_count: number;
+  following_count: number;
+  themes_count: number;
+}
+
+export const getMe = () => apiFetch<MeProfile>("/api/v1/me/");
+
+export const updateMeBio = (bio: string) =>
+  apiFetch<MeProfile>("/api/v1/me/", { method: "PATCH", body: JSON.stringify({ bio }) });
+
+async function apiFetchMultipart<T>(path: string, formData: FormData, retry = true): Promise<T> {
+  if (!isServer && accessTokenExpired()) {
+    await refreshAccessToken();
+  }
+
+  const res = await fetch(`${apiBase()}${path}`, {
+    method: "PATCH",
+    headers: { ...authHeaders() },
+    body: formData,
+    cache: "no-store",
+  });
+
+  if (res.status === 401 && retry && !isServer) {
+    const ok = await refreshAccessToken();
+    if (ok) return apiFetchMultipart<T>(path, formData, false);
+    logout();
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(humanizeApiError(res.status, body));
+  }
+  return res.json() as Promise<T>;
+}
+
+export const updateMeAvatar = (file: File) => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+  return apiFetchMultipart<MeProfile>("/api/v1/me/", formData);
+};
+
+export const deleteMeAvatar = () =>
+  apiFetch<MeProfile>("/api/v1/me/", { method: "PATCH", body: JSON.stringify({ avatar: null }) });
+
+export const USER_PROFILE_EVENT = "mindset-user-profile";
+
+export interface UserProfileUpdatedDetail {
+  username: string;
+  avatar?: string | null;
+  bio?: string;
+}
+
+export function emitUserProfileUpdated(detail: UserProfileUpdatedDetail) {
+  if (typeof window !== "undefined") {
+    if (detail.avatar !== undefined) {
+      setUserAvatarOverride(detail.username, detail.avatar);
+      updateAuthorAvatarInFeedCache(detail.username, detail.avatar);
+    }
+    window.dispatchEvent(new CustomEvent(USER_PROFILE_EVENT, { detail }));
+  }
+}
+
+// Мгновенное обновление ленты и счётчиков без перезагрузки страницы.
+export const THEME_CREATED_EVENT = "mindset-theme-created";
+
+export function emitThemeCreated(theme: Theme) {
+  prependThemeToFeedCache(theme);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(THEME_CREATED_EVENT, { detail: theme }));
+  }
+}
+
+export const REPLY_CREATED_EVENT = "mindset-reply-created";
+
+export interface ReplyCreatedDetail {
+  themeId: number;
+  parentId: number | null;
+  reply: Reply;
+  themeRepliesCount: number;
+  parentRepliesCount?: number;
+}
+
+export function emitReplyCreated(detail: ReplyCreatedDetail) {
+  updateThemeRepliesInFeedCache(detail.themeId, detail.themeRepliesCount);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(REPLY_CREATED_EVENT, { detail }));
+  }
+}
+
+export const THEME_LIKE_EVENT = "mindset-theme-like";
+
+export interface ThemeLikeDetail {
+  themeId: number;
+  liked: boolean;
+  likes_count: number;
+}
+
+export function emitThemeLikeChanged(detail: ThemeLikeDetail) {
+  updateThemeLikeInFeedCache(detail.themeId, detail.liked, detail.likes_count);
+  updateThemeLikeInProfileCache(detail.themeId, detail.liked, detail.likes_count);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(THEME_LIKE_EVENT, { detail }));
+  }
+}
+
+export const THEME_REPOST_EVENT = "mindset-theme-repost";
+
+export interface ThemeRepostDetail {
+  themeId: number;
+  reposted: boolean;
+  reposts_count: number;
+}
+
+export function emitThemeRepostChanged(detail: ThemeRepostDetail) {
+  updateThemeRepostInFeedCache(detail.themeId, detail.reposted, detail.reposts_count);
+  updateThemeRepostInProfileCache(detail.themeId, detail.reposted, detail.reposts_count);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(THEME_REPOST_EVENT, { detail }));
+  }
+}

@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mindset}
+      POSTGRES_USER: ${POSTGRES_USER:-mindset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mindset}
+    ports:
+      # 5433 снаружи: на 5432 живет локальный Homebrew postgresql@14
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindset}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      # 6380 снаружи: на 6379 живет локальный Homebrew redis
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  pg_data:
+  redis_data:

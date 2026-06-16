@@ -908,7 +908,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   --thread-pad-x: 8px;
   --thread-avatar-size: 38px;
   --thread-card-py: 8px;
-  --thread-gap: 8px;
+  --thread-gap: 7px;
   /* padding: 10px 0; */
 }
 .thread-chain .card {

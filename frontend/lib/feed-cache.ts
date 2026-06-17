@@ -78,6 +78,12 @@ export function updateThemeRepliesInFeedCache(themeId: number, repliesCount: num
   });
 }
 
+export function removeAuthorFromFollowingFeedCache(username: string) {
+  const cache = feedCaches["following"];
+  if (!cache) return;
+  cache.themes = cache.themes.filter((t) => t.author.username !== username);
+}
+
 export function updateAuthorAvatarInFeedCache(username: string, avatar: string | null) {
   updateAllCaches((c) => {
     c.themes = c.themes.map((t) =>

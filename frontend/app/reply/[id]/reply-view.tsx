@@ -9,7 +9,13 @@ import { Reply, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } f
 import { patchReplyAuthors } from "@/lib/user-avatar-store";
 
 // Страница «ответы на ответ»: сам ответ + его дочерние ответы.
-export default function ReplyThreadView({ id }: { id: number }) {
+export default function ReplyThreadView({
+  id,
+  focusReplyId = null,
+}: {
+  id: number;
+  focusReplyId?: number | null;
+}) {
   const [reply, setReply] = useState<Reply | null>(null);
   const [children, setChildren] = useState<Reply[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,13 +26,18 @@ export default function ReplyThreadView({ id }: { id: number }) {
     try {
       const data = await getReplyDetail(id);
       setReply(data.reply);
-      setChildren(data.replies);
+      if (focusReplyId) {
+        const focused = data.replies.find((r) => r.id === focusReplyId);
+        setChildren(focused ? [focused] : []);
+      } else {
+        setChildren(data.replies);
+      }
     } catch {
       setError("Reply not found or the API is unavailable.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, focusReplyId]);
 
   useEffect(() => {
     load();

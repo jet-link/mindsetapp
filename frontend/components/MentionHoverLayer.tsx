@@ -8,12 +8,8 @@ import {
   UserProfile,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
-  emitFollowChanged,
   formatCount,
   getProfile,
-  getStoredUsername,
-  isLoggedIn,
-  toggleFollow,
 } from "@/lib/api";
 
 function mentionUsername(link: HTMLAnchorElement): string {
@@ -39,8 +35,6 @@ export default function MentionHoverLayer() {
   const pathname = usePathname();
   const [anchor, setAnchor] = useState<HTMLAnchorElement | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [following, setFollowing] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [cardPos, setCardPos] = useState<{ top: number; left: number } | null>(null);
   const cacheRef = useRef(new Map<string, UserProfile>());
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,14 +90,12 @@ export default function MentionHoverLayer() {
       const cached = cacheRef.current.get(username);
       if (cached) {
         setProfile(cached);
-        setFollowing(cached.is_following);
       } else {
         setProfile(null);
         getProfile(username)
           .then((p) => {
             cacheRef.current.set(username, p);
             setProfile(p);
-            setFollowing(p.is_following);
           })
           .catch(() => setProfile(null));
       }
@@ -173,7 +165,7 @@ export default function MentionHoverLayer() {
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [anchor, profile, following, busy]);
+  }, [anchor, profile]);
 
   if (!anchor) return null;
 
@@ -189,43 +181,7 @@ export default function MentionHoverLayer() {
   const top = cardPos?.top ?? rect.bottom + CARD_GAP;
   const left = cardPos?.left ?? fallbackLeft;
 
-  const me = typeof window !== "undefined" ? getStoredUsername() : null;
-  const isOwn = profile?.username === me;
-
   const dismiss = () => hideCard(setAnchor, setProfile, setCardPos, hideTimer);
-
-  async function onFollow(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!profile || !isLoggedIn()) {
-      window.location.href = "/login";
-      return;
-    }
-    const optimistic = !following;
-    setFollowing(optimistic);
-    setBusy(true);
-    try {
-      const r = await toggleFollow(profile.username);
-      setFollowing(r.following);
-      const updated = {
-        ...profile,
-        is_following: r.following,
-        followers_count: r.followers_count,
-      };
-      setProfile(updated);
-      cacheRef.current.set(profile.username, updated);
-      emitFollowChanged({
-        profileUsername: profile.username,
-        followers_count: r.followers_count,
-        viewerUsername: me ?? undefined,
-        viewer_following_count: r.following_count,
-      });
-    } catch {
-      setFollowing(!optimistic);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div
@@ -272,16 +228,6 @@ export default function MentionHoverLayer() {
               {formatCount(profile.following_count)} following
             </div>
           </Link>
-          {!isOwn && (
-            <button
-              type="button"
-              className={`mention-hover-card__follow${following ? " mention-hover-card__follow--active" : ""}`}
-              onClick={onFollow}
-              disabled={busy}
-            >
-              {following ? "Following" : "Follow"}
-            </button>
-          )}
         </>
       ) : (
         <p className="muted mention-hover-card__loading">Loading…</p>

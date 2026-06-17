@@ -51,6 +51,7 @@ export default function ProfileActions({
       const viewer = getStoredUsername() ?? undefined;
       emitFollowChanged({
         profileUsername: username,
+        following: r.following,
         followers_count: r.followers_count,
         viewerUsername: viewer,
         viewer_following_count: r.following_count,

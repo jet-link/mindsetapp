@@ -7,6 +7,7 @@ import {
   updateThemeRepliesInFeedCache,
   updateThemeLikeInFeedCache,
   updateThemeRepostInFeedCache,
+  removeAuthorFromFollowingFeedCache,
   clearFeedCache,
 } from "./feed-cache";
 import { clearProfileTabsCache, updateThemeLikeInProfileCache, updateThemeRepostInProfileCache } from "./profile-tabs-cache";
@@ -493,6 +494,7 @@ export const FOLLOW_EVENT = "mindset-follow";
 
 export interface FollowChangedDetail {
   profileUsername: string;
+  following?: boolean;
   followers_count?: number;
   viewerUsername?: string;
   viewer_following_count?: number;
@@ -500,6 +502,9 @@ export interface FollowChangedDetail {
 
 export function emitFollowChanged(detail: FollowChangedDetail) {
   if (typeof window !== "undefined") {
+    if (detail.following === false) {
+      removeAuthorFromFollowingFeedCache(detail.profileUsername);
+    }
     window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
   }
 }
@@ -532,6 +537,7 @@ export interface NotificationItem {
   verb: "reply" | "repost";
   theme_id: number | null;
   reply_id: number | null;
+  reply_parent_id: number | null;
   is_read: boolean;
   created_at: string;
 }

@@ -40,6 +40,7 @@ function UserRow({ user }: { user: UserPublic }) {
       const viewer = getStoredUsername() ?? undefined;
       emitFollowChanged({
         profileUsername: user.username,
+        following: r.following,
         followers_count: r.followers_count,
         viewerUsername: viewer,
         viewer_following_count: r.following_count,

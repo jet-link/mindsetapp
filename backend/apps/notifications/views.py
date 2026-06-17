@@ -17,7 +17,7 @@ class NotificationListView(generics.ListAPIView):
         return (
             Notification.objects
             .filter(recipient=self.request.user, verb__in=NOTIFICATION_VERBS)
-            .select_related('actor')
+            .select_related('actor', 'reply')
         )
 
 

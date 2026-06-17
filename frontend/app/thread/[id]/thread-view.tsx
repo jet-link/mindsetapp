@@ -6,12 +6,18 @@ import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "./reply-form";
-import { Reply, Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getThread } from "@/lib/api";
+import { Reply, Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
 import { patchReplyAuthors, patchThemeAuthors } from "@/lib/user-avatar-store";
 
 // Загрузка на клиенте: JWT уходит вместе с запросом, поэтому
 // is_liked / is_reposted совпадают с состоянием на стене.
-export default function ThreadView({ id }: { id: number }) {
+export default function ThreadView({
+  id,
+  focusReplyId = null,
+}: {
+  id: number;
+  focusReplyId?: number | null;
+}) {
   const [theme, setTheme] = useState<Theme | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,13 +28,23 @@ export default function ThreadView({ id }: { id: number }) {
     try {
       const data = await getThread(id);
       setTheme(data.theme);
-      setReplies(data.replies);
+      if (focusReplyId) {
+        const focused = data.replies.find((r) => r.id === focusReplyId);
+        if (focused) {
+          setReplies([focused]);
+        } else {
+          const detail = await getReplyDetail(focusReplyId);
+          setReplies([detail.reply]);
+        }
+      } else {
+        setReplies(data.replies);
+      }
     } catch {
       setError("Thread not found or the API is unavailable.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, focusReplyId]);
 
   useEffect(() => {
     load();

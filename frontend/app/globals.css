@@ -1134,6 +1134,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .notif-row {
   display: flex;
+  align-items: center;
   gap: 12px;
   padding: 12px;
   border-radius: 12px;
@@ -1141,11 +1142,16 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .notif-row--unread { background: rgba(196, 69, 105, 0.06); }
 .notif-row__main { flex: 1; min-width: 0; }
-.notif-row__main p { margin: 0 0 4px; }
-.notif-row__link {
-  font-size: 13px;
+.notif-row__main p { margin: 0; }
+.notif-row__action {
+  flex: 0 0 auto;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--link);
+  color: #ffffff;
+  white-space: nowrap;
+  padding: 6px 15px;
+  background: #000000;
+  border-radius: 999px;
 }
 
 .page-status { padding: 12px; }

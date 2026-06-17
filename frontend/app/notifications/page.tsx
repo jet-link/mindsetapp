@@ -24,7 +24,14 @@ function verbText(n: NotificationItem): string {
 }
 
 function targetHref(n: NotificationItem): string | null {
-  if (n.verb === "reply" && n.reply_id) return `/reply/${n.reply_id}`;
+  if (n.verb === "reply" && n.reply_id) {
+    if (n.reply_parent_id) {
+      return `/reply/${n.reply_parent_id}?reply=${n.reply_id}`;
+    }
+    if (n.theme_id) {
+      return `/thread/${n.theme_id}?reply=${n.reply_id}`;
+    }
+  }
   if (n.theme_id) return `/thread/${n.theme_id}`;
   return null;
 }
@@ -160,12 +167,12 @@ export default function NotificationsPage() {
                   </Link>{" "}
                   {verbText(n)}
                 </p>
-                {href && (
-                  <Link href={href} className="notif-row__link">
-                    View
-                  </Link>
-                )}
               </div>
+              {href && (
+                <Link href={href} className="notif-row__action">
+                  View
+                </Link>
+              )}
             </div>
           );
         })}

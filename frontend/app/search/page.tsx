@@ -15,6 +15,8 @@ import {
   searchUsers,
 } from "@/lib/api";
 import { patchThemeAuthors, patchUserPublicList } from "@/lib/user-avatar-store";
+import { findReturnAnchorByPrefix, parseListKeySearchParams, setListKey } from "@/lib/return-anchor";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 
 type SearchTab = "themes" | "users";
 
@@ -28,9 +30,21 @@ function cacheKey(tab: SearchTab, q: string) {
   return `${tab}:${q.toLowerCase()}`;
 }
 
+function initialSearchState(): { tab: SearchTab; query: string } {
+  const anchor = findReturnAnchorByPrefix("/search?");
+  if (anchor) {
+    const params = parseListKeySearchParams(anchor.listKey);
+    const tab = params.get("tab");
+    const q = params.get("q") ?? "";
+    return { tab: tab === "users" ? "users" : "themes", query: q };
+  }
+  return { tab: "themes", query: "" };
+}
+
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<SearchTab>("themes");
+  const initial = initialSearchState();
+  const [query, setQuery] = useState(initial.query);
+  const [tab, setTab] = useState<SearchTab>(initial.tab);
   const [themeResults, setThemeResults] = useState<Theme[]>([]);
   const [userResults, setUserResults] = useState<UserPublic[]>([]);
   const [popular, setPopular] = useState<{ themes: string[]; users: string[] }>({
@@ -163,6 +177,13 @@ export default function SearchPage() {
   const showEmpty =
     searched && !fetching && !error && query.trim() && activeResults.length === 0;
   const resultsPanelId = tab === "themes" ? themesPanelId : usersPanelId;
+  const listKey = `/search?tab=${tab}${query.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`;
+
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(listKey, tab === "themes" && searched && !fetching && themeResults.length > 0);
 
   function applyPopular(value: string, popularTab: SearchTab) {
     setTab(popularTab);

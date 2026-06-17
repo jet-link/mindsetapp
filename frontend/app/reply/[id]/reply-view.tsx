@@ -6,6 +6,9 @@ import ReplyCard from "@/components/ReplyCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "@/app/thread/[id]/reply-form";
 import { Reply, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
+import { getReplyDetailCache, setReplyDetailCache } from "@/lib/detail-cache";
+import { setListKey } from "@/lib/return-anchor";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchReplyAuthors } from "@/lib/user-avatar-store";
 
 // Страница «ответы на ответ»: сам ответ + его дочерние ответы.
@@ -16,10 +19,18 @@ export default function ReplyThreadView({
   id: number;
   focusReplyId?: number | null;
 }) {
-  const [reply, setReply] = useState<Reply | null>(null);
-  const [children, setChildren] = useState<Reply[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = getReplyDetailCache(id);
+  const [reply, setReply] = useState<Reply | null>(initialCache?.reply ?? null);
+  const [children, setChildren] = useState<Reply[]>(initialCache?.children ?? []);
+  const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
+  const listKey = `/reply/${id}`;
+
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(listKey, !loading && !!reply, { scrollTopWhenNoAnchor: true });
 
   const load = useCallback(async () => {
     setError("");
@@ -31,6 +42,7 @@ export default function ReplyThreadView({
         setChildren(focused ? [focused] : []);
       } else {
         setChildren(data.replies);
+        setReplyDetailCache(id, { reply: data.reply, children: data.replies });
       }
     } catch {
       setError("Reply not found or the API is unavailable.");
@@ -40,8 +52,19 @@ export default function ReplyThreadView({
   }, [id, focusReplyId]);
 
   useEffect(() => {
+    if (focusReplyId) {
+      load();
+      return;
+    }
+    const snap = getReplyDetailCache(id);
+    if (snap) {
+      setReply(snap.reply);
+      setChildren(snap.children);
+      setLoading(false);
+      return;
+    }
     load();
-  }, [load]);
+  }, [id, focusReplyId, load]);
 
   useEffect(() => {
     const onProfileUpdated = (e: Event) => {

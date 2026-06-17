@@ -23,6 +23,12 @@ import {
   clearProfileTabsCache,
 } from "@/lib/profile-tabs-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
+import {
+  findReturnAnchorByPrefix,
+  parseListKeySearchParams,
+  setListKey,
+} from "@/lib/return-anchor";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 const ALL_TABS: ProfileTab[] = ["themes", "replies", "media", "reposts"];
@@ -69,6 +75,15 @@ const EMPTY_TEXT: Record<ProfileTab, string> = {
   reposts: "No reposts yet.",
 };
 
+function initialProfileTab(username: string): ProfileTab {
+  const anchor = findReturnAnchorByPrefix(`/u/${username}?`);
+  if (anchor) {
+    const tab = parseListKeySearchParams(anchor.listKey).get("tab");
+    if (tab && ALL_TABS.includes(tab as ProfileTab)) return tab as ProfileTab;
+  }
+  return "themes";
+}
+
 export default function ProfileTabs({
   username,
   counts,
@@ -76,9 +91,10 @@ export default function ProfileTabs({
   username: string;
   counts: ProfileCounts;
 }) {
-  const [tab, setTab] = useState<ProfileTab>("themes");
+  const initialTab = initialProfileTab(username);
+  const [tab, setTab] = useState<ProfileTab>(initialTab);
   const [slices, setSlices] = useState<Record<ProfileTab, TabSlice>>(emptySlices);
-  const [loadingTab, setLoadingTab] = useState<ProfileTab | null>("themes");
+  const [loadingTab, setLoadingTab] = useState<ProfileTab | null>(initialTab);
   const [error, setError] = useState("");
   const slicesRef = useRef(slices);
   const panelsRef = useRef<HTMLDivElement>(null);
@@ -98,6 +114,7 @@ export default function ProfileTabs({
   }, []);
 
   const restoreLockedScroll = useCallback(() => {
+    if (findReturnAnchorByPrefix(`/u/${username}?`)) return;
     const y = lockedScrollY.current;
     if (!scrollLocked.current || y === null) return;
     applyScrollFloor();
@@ -337,6 +354,17 @@ export default function ProfileTabs({
 
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
+  const listKey = `/u/${username}?tab=${tab}`;
+
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(
+    listKey,
+    activeSlice.loaded && !activeLoading && (activeSlice.themes.length > 0 || activeSlice.replies.length > 0),
+  );
+
   const sentinelRef = useInfiniteScroll({
     hasMore: !!activeSlice.nextCursor,
     loading: activeLoading,

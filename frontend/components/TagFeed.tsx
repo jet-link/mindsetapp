@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ThemeCard from "@/components/ThemeCard";
 import {
   THEME_LIKE_EVENT,
@@ -12,11 +12,11 @@ import {
   Theme,
   getTagThemes,
 } from "@/lib/api";
+import { setListKey } from "@/lib/return-anchor";
 import { getTagCache, setTagCache } from "@/lib/tag-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
-
-const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export default function TagFeed({ slug }: { slug: string }) {
   const initialCache = getTagCache(slug);
@@ -24,9 +24,10 @@ export default function TagFeed({ slug }: { slug: string }) {
   const [nextCursor, setNextCursor] = useState<string | null>(initialCache?.nextCursor ?? null);
   const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState("");
-  const restoredRef = useRef(false);
   const slugRef = useRef(slug);
   slugRef.current = slug;
+
+  const listKey = `/tags/${slug}`;
 
   const load = useCallback(async (cursor?: string) => {
     setLoading(true);
@@ -45,9 +46,14 @@ export default function TagFeed({ slug }: { slug: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(listKey, !loading && themes.length > 0);
+
   // При смене тега или возврате с детальной — кэш без повторной загрузки.
   useEffect(() => {
-    restoredRef.current = false;
     const cache = getTagCache(slug);
     if (cache && cache.themes.length) {
       setThemes(cache.themes);
@@ -63,22 +69,8 @@ export default function TagFeed({ slug }: { slug: string }) {
   }, [slug, load]);
 
   useEffect(() => {
-    const cache = getTagCache(slug);
-    setTagCache(slug, {
-      themes,
-      nextCursor,
-      scrollY: cache?.scrollY ?? 0,
-    });
+    setTagCache(slug, { themes, nextCursor, scrollY: 0 });
   }, [themes, nextCursor, slug]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const cache = getTagCache(slugRef.current);
-      if (cache) cache.scrollY = window.scrollY;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     const onThemeLike = (e: Event) => {
@@ -111,14 +103,6 @@ export default function TagFeed({ slug }: { slug: string }) {
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     };
   }, []);
-
-  useIsoLayoutEffect(() => {
-    const cache = getTagCache(slug);
-    if (!restoredRef.current && cache && cache.themes.length) {
-      restoredRef.current = true;
-      window.scrollTo(0, cache.scrollY);
-    }
-  }, [slug, themes]);
 
   const sentinelRef = useInfiniteScroll({
     hasMore: !!nextCursor,

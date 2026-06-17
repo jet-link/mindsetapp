@@ -32,6 +32,8 @@ import {
   removeAuthorFromFollowingFeedCache,
 } from "@/lib/feed-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
+import { findReturnAnchorByPrefix, parseListKeySearchParams, setListKey } from "@/lib/return-anchor";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 type WallTab = "for-you" | "following";
@@ -87,9 +89,18 @@ function mapSlices(
   return next;
 }
 
+function initialWallTab(): WallTab {
+  const anchor = findReturnAnchorByPrefix("/?tab=");
+  if (anchor) {
+    const tab = parseListKeySearchParams(anchor.listKey).get("tab");
+    if (tab) return normalizeTab(tab);
+  }
+  return normalizeTab(getLastFeedTab());
+}
+
 export default function Feed() {
   const router = useRouter();
-  const initialTab = normalizeTab(getLastFeedTab());
+  const initialTab = initialWallTab();
 
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [tab, setTab] = useState<WallTab>(initialTab);
@@ -120,6 +131,7 @@ export default function Feed() {
   }, []);
 
   const restoreLockedScroll = useCallback(() => {
+    if (findReturnAnchorByPrefix("/?tab=")) return;
     const y = lockedScrollY.current;
     if (!scrollLocked.current || y === null) return;
     applyScrollFloor();
@@ -235,10 +247,7 @@ export default function Feed() {
         if (Math.abs(window.scrollY - lockedScrollY.current) > 1) {
           restoreLockedScroll();
         }
-        return;
       }
-      const cache = getFeedCache(tabRef.current);
-      if (cache) cache.scrollY = window.scrollY;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -266,11 +275,10 @@ export default function Feed() {
     for (const tabId of ALL_TABS) {
       const slice = slices[tabId];
       if (!slice.loaded) continue;
-      const existing = getFeedCache(tabId);
       setFeedCache(tabId, {
         themes: slice.themes,
         nextCursor: slice.nextCursor,
-        scrollY: existing?.scrollY ?? 0,
+        scrollY: 0,
       });
     }
   }, [slices]);
@@ -370,6 +378,13 @@ export default function Feed() {
 
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
+  const listKey = `/?tab=${tab}`;
+
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(listKey, activeSlice.loaded && !activeLoading);
 
   const sentinelRef = useInfiniteScroll({
     hasMore: !!activeSlice.nextCursor,

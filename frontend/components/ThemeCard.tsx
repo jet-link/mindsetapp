@@ -16,6 +16,7 @@ import {
   toggleLike,
   toggleRepost,
 } from "@/lib/api";
+import { saveReturnAnchor } from "@/lib/return-anchor";
 
 
 export default function ThemeCard({
@@ -106,11 +107,12 @@ export default function ThemeCard({
     if (!clickable) return;
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
+    saveReturnAnchor({ kind: "theme", id: theme.id });
     router.push(`/thread/${theme.id}`);
   }
 
   return (
-    <article className="card">
+    <article className="card" data-anchor-theme={theme.id}>
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >

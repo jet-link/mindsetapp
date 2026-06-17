@@ -7,6 +7,9 @@ import ThemeCard from "@/components/ThemeCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "./reply-form";
 import { Reply, Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
+import { getThreadCache, setThreadCache } from "@/lib/detail-cache";
+import { setListKey } from "@/lib/return-anchor";
+import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchReplyAuthors, patchThemeAuthors } from "@/lib/user-avatar-store";
 
 // Загрузка на клиенте: JWT уходит вместе с запросом, поэтому
@@ -18,10 +21,18 @@ export default function ThreadView({
   id: number;
   focusReplyId?: number | null;
 }) {
-  const [theme, setTheme] = useState<Theme | null>(null);
-  const [replies, setReplies] = useState<Reply[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = getThreadCache(id);
+  const [theme, setTheme] = useState<Theme | null>(initialCache?.theme ?? null);
+  const [replies, setReplies] = useState<Reply[]>(initialCache?.replies ?? []);
+  const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
+  const listKey = `/thread/${id}`;
+
+  useEffect(() => {
+    setListKey(listKey);
+  }, [listKey]);
+
+  useRestoreAnchor(listKey, !loading && !!theme, { scrollTopWhenNoAnchor: true });
 
   const load = useCallback(async () => {
     setError("");
@@ -38,6 +49,7 @@ export default function ThreadView({
         }
       } else {
         setReplies(data.replies);
+        setThreadCache(id, { theme: data.theme, replies: data.replies });
       }
     } catch {
       setError("Thread not found or the API is unavailable.");
@@ -47,8 +59,19 @@ export default function ThreadView({
   }, [id, focusReplyId]);
 
   useEffect(() => {
+    if (focusReplyId) {
+      load();
+      return;
+    }
+    const snap = getThreadCache(id);
+    if (snap) {
+      setTheme(snap.theme);
+      setReplies(snap.replies);
+      setLoading(false);
+      return;
+    }
     load();
-  }, [load]);
+  }, [id, focusReplyId, load]);
 
   useEffect(() => {
     const onProfileUpdated = (e: Event) => {

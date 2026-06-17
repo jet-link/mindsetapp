@@ -14,6 +14,7 @@ import {
   toggleReplyLike,
   toggleReplyRepost,
 } from "@/lib/api";
+import { saveReturnAnchor } from "@/lib/return-anchor";
 
 export default function ReplyCard({
   reply,
@@ -99,11 +100,12 @@ export default function ReplyCard({
     if (!clickable) return;
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
+    saveReturnAnchor({ kind: "reply", id: reply.id });
     router.push(`/reply/${reply.id}`);
   }
 
   return (
-    <article className={`card${indented ? " card--reply" : ""}`}>
+    <article className={`card${indented ? " card--reply" : ""}`} data-anchor-reply={reply.id}>
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >

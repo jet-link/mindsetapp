@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FOLLOW_EVENT, FollowChangedDetail, getProfile } from "@/lib/api";
+import { FOLLOW_EVENT, FollowChangedDetail, getProfile, getStoredUsername } from "@/lib/api";
 
 export default function ProfileStats({
   username,
@@ -42,7 +42,7 @@ export default function ProfileStats({
       if (detail.profileUsername === username && detail.followers_count !== undefined) {
         setFollowersCount(detail.followers_count);
       }
-      const me = localStorage.getItem("mindset_username");
+      const me = getStoredUsername();
       if (
         me === username &&
         detail.viewerUsername === me &&

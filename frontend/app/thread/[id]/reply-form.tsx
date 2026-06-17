@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import { createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
+import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
 import {
   THEME_BODY_LIMIT,
   normalizeThemeBody,
@@ -23,6 +24,7 @@ export default function ReplyForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const cooldown = useCooldown();
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -67,7 +69,14 @@ export default function ReplyForm({
       });
       onPosted?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to post the reply");
+      const message = err instanceof Error ? err.message : "Failed to post the reply";
+      const secs = parseCooldownSeconds(message);
+      if (secs) {
+        cooldown.start(secs);
+        setError("");
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
@@ -87,7 +96,7 @@ export default function ReplyForm({
       />
       <div className="composer-footer">
         <div className="composer-actions">
-          <button className="btn" type="submit" disabled={busy || !body.trim() || overLimit}>
+          <button className="btn" type="submit" disabled={busy || !body.trim() || overLimit || cooldown.active}>
             Reply
           </button>
           <button type="button" className="icon-btn" disabled title="Attach — coming soon" aria-label="Attach file">
@@ -95,9 +104,13 @@ export default function ReplyForm({
           </button>
         </div>
         <div className="composer-meta">
-          <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
-            {chars}/{THEME_BODY_LIMIT}
-          </span>
+          {cooldown.active ? (
+            <span className="bio-counter">You can reply again in {cooldown.seconds}s</span>
+          ) : (
+            <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
+              {chars}/{THEME_BODY_LIMIT}
+            </span>
+          )}
         </div>
       </div>
       {error && (

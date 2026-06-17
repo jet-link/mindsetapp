@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AUTH_EVENT, isLoggedIn } from "@/lib/api";
+import { AUTH_EVENT, getStoredUsername, isLoggedIn } from "@/lib/api";
 
 type Kind = "theme" | "reply";
 
@@ -26,7 +26,7 @@ export default function CardMenu({
   useEffect(() => {
     const syncAuth = () => {
       setAuthed(isLoggedIn());
-      setIsOwn(localStorage.getItem("mindset_username") === authorUsername);
+      setIsOwn(getStoredUsername() === authorUsername);
     };
     syncAuth();
     window.addEventListener(AUTH_EVENT, syncAuth);

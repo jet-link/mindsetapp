@@ -11,6 +11,7 @@ import {
   emitFollowChanged,
   formatCount,
   getProfile,
+  getStoredUsername,
   isLoggedIn,
   toggleFollow,
 } from "@/lib/api";
@@ -188,7 +189,7 @@ export default function MentionHoverLayer() {
   const top = cardPos?.top ?? rect.bottom + CARD_GAP;
   const left = cardPos?.left ?? fallbackLeft;
 
-  const me = typeof window !== "undefined" ? localStorage.getItem("mindset_username") : null;
+  const me = typeof window !== "undefined" ? getStoredUsername() : null;
   const isOwn = profile?.username === me;
 
   const dismiss = () => hideCard(setAnchor, setProfile, setCardPos, hideTimer);

@@ -22,6 +22,7 @@ import {
   ProfileTab,
   clearProfileTabsCache,
 } from "@/lib/profile-tabs-cache";
+import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 const ALL_TABS: ProfileTab[] = ["themes", "replies", "media", "reposts"];
@@ -334,6 +335,16 @@ export default function ProfileTabs({
     };
   }, []);
 
+  const activeSlice = slices[tab];
+  const activeLoading = loadingTab === tab;
+  const sentinelRef = useInfiniteScroll({
+    hasMore: !!activeSlice.nextCursor,
+    loading: activeLoading,
+    onLoadMore: () => {
+      if (activeSlice.nextCursor) load(tab, activeSlice.nextCursor);
+    },
+  });
+
   const TAB_DEFS: { id: ProfileTab; label: string; count: number }[] = [
     { id: "themes", label: "Themes", count: counts.themes },
     { id: "replies", label: "Replies", count: counts.replies },
@@ -402,16 +413,21 @@ export default function ProfileTabs({
                 <p className="muted">Loading…</p>
               )}
 
-              {isActive && slice.nextCursor && !isLoading && (
-                <p className="muted">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => load(tabId, slice.nextCursor!)}
-                  >
-                    Show more
-                  </button>
-                </p>
+              {isActive && slice.nextCursor && (
+                <>
+                  <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
+                  {!isLoading && (
+                    <p className="muted">
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => load(tabId, slice.nextCursor!)}
+                      >
+                        Show more
+                      </button>
+                    </p>
+                  )}
+                </>
               )}
             </div>
           );

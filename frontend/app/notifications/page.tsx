@@ -16,6 +16,7 @@ import {
   markAllNotificationsRead,
 } from "@/lib/api";
 import { patchNotificationActors } from "@/lib/user-avatar-store";
+import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 
 function verbText(n: NotificationItem): string {
   if (n.verb === "repost") return "reposted your theme";
@@ -100,6 +101,14 @@ export default function NotificationsPage() {
     }
   }
 
+  const sentinelRef = useInfiniteScroll({
+    hasMore: !!nextCursor,
+    loading,
+    onLoadMore: () => {
+      if (nextCursor) load(nextCursor);
+    },
+  });
+
   const hasItems = items.length > 0;
   const hasUnread = items.some((n) => !n.is_read);
   const readAllDisabled = busy || !hasItems || !hasUnread;
@@ -162,12 +171,18 @@ export default function NotificationsPage() {
         })}
       </div>
 
-      {nextCursor && !loading && (
-        <p className="muted">
-          <button className="link-btn" onClick={() => load(nextCursor)}>
-            Show more
-          </button>
-        </p>
+      {nextCursor && (
+        <>
+          <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
+          {loading && items.length > 0 && <p className="muted">Loading…</p>}
+          {!loading && (
+            <p className="muted">
+              <button className="link-btn" onClick={() => load(nextCursor)}>
+                Show more
+              </button>
+            </p>
+          )}
+        </>
       )}
     </main>
   );

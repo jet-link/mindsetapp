@@ -101,9 +101,48 @@ function apiBase(): string {
   return isServer ? process.env.API_ORIGIN ?? "http://127.0.0.1:8000" : "";
 }
 
+// --- Хранилище токенов: "Remember me" ---
+// remember=true  -> localStorage  (сессия живёт после перезапуска браузера)
+// remember=false -> sessionStorage (очищается при закрытии вкладки/браузера)
+const ACCESS_KEY = "mindset_access";
+const REFRESH_KEY = "mindset_refresh";
+const USERNAME_KEY = "mindset_username";
+const REMEMBER_KEY = "mindset_remember";
+const TOKEN_KEYS = [ACCESS_KEY, REFRESH_KEY, USERNAME_KEY];
+
+function preferredStore(): Storage {
+  // Флаг предпочтения держим в localStorage, чтобы он переживал перезапуск.
+  return localStorage.getItem(REMEMBER_KEY) === "0" ? sessionStorage : localStorage;
+}
+
+function readStored(key: string): string | null {
+  if (isServer) return null;
+  // Читаем из обоих хранилищ — токен мог попасть в любое из них.
+  return sessionStorage.getItem(key) ?? localStorage.getItem(key);
+}
+
+function writeStored(key: string, value: string) {
+  if (isServer) return;
+  preferredStore().setItem(key, value);
+}
+
+function clearStored() {
+  if (isServer) return;
+  for (const key of TOKEN_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+  localStorage.removeItem(REMEMBER_KEY);
+}
+
+/** Имя текущего пользователя из активного хранилища (или null). */
+export function getStoredUsername(): string | null {
+  return readStored(USERNAME_KEY);
+}
+
 function authHeaders(): Record<string, string> {
   if (isServer) return {};
-  const token = localStorage.getItem("mindset_access");
+  const token = readStored(ACCESS_KEY);
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -133,7 +172,7 @@ let refreshInFlight: Promise<boolean> | null = null;
 
 async function refreshAccessToken(): Promise<boolean> {
   if (isServer) return false;
-  const refresh = localStorage.getItem("mindset_refresh");
+  const refresh = readStored(REFRESH_KEY);
   if (!refresh) return false;
 
   if (!refreshInFlight) {
@@ -147,9 +186,9 @@ async function refreshAccessToken(): Promise<boolean> {
         });
         if (!res.ok) return false;
         const data = (await res.json()) as { access?: string; refresh?: string };
-        if (data.access) localStorage.setItem("mindset_access", data.access);
+        if (data.access) writeStored(ACCESS_KEY, data.access);
         // ROTATE_REFRESH_TOKENS=True — сохраняем новый refresh-токен
-        if (data.refresh) localStorage.setItem("mindset_refresh", data.refresh);
+        if (data.refresh) writeStored(REFRESH_KEY, data.refresh);
         return !!data.access;
       } catch {
         return false;
@@ -163,7 +202,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
 function accessTokenExpired(): boolean {
   if (isServer) return false;
-  const token = localStorage.getItem("mindset_access");
+  const token = readStored(ACCESS_KEY);
   if (!token) return false;
   try {
     const payload = JSON.parse(atob(token.split(".")[1])) as { exp?: number };
@@ -210,7 +249,7 @@ export async function apiFetch<T>(
       });
       if (anon.ok) return anon.json() as Promise<T>;
     }
-    logout();
+    forceLogoutRedirect();
   }
 
   if (!res.ok) {
@@ -222,16 +261,22 @@ export async function apiFetch<T>(
 
 /** Есть ли сохраненный JWT (только в браузере). */
 export function isLoggedIn(): boolean {
-  return typeof window !== "undefined" && !!localStorage.getItem("mindset_access");
+  return typeof window !== "undefined" && !!readStored(ACCESS_KEY);
 }
 
 export function logout() {
-  localStorage.removeItem("mindset_access");
-  localStorage.removeItem("mindset_refresh");
-  localStorage.removeItem("mindset_username");
+  clearStored();
   clearFeedCache();
   clearProfileTabsCache();
   emitAuthChanged();
+}
+
+/** Принудительный выход (протухшая сессия): чистим токены и уводим на /login. */
+function forceLogoutRedirect() {
+  logout();
+  if (!isServer && window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
 }
 
 // --- Auth ---
@@ -243,25 +288,80 @@ function emitAuthChanged() {
   window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
-export async function login(username: string, password: string) {
-  const data = await apiFetch<{ access: string; refresh: string }>(
-    "/api/v1/auth/token/",
-    { method: "POST", body: JSON.stringify({ username, password }) },
-  );
-  localStorage.setItem("mindset_access", data.access);
-  localStorage.setItem("mindset_refresh", data.refresh);
-  localStorage.setItem("mindset_username", username);
+export type LoginErrorCode = "user_not_found" | "password_incorrect";
+
+export class LoginError extends Error {
+  code: LoginErrorCode;
+
+  constructor(code: LoginErrorCode, message: string) {
+    super(message);
+    this.name = "LoginError";
+    this.code = code;
+  }
+}
+
+export async function login(username: string, password: string, remember = true) {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+    cache: "no-store",
+  });
+
+  const data = (await res.json()) as {
+    ok?: boolean;
+    access?: string;
+    refresh?: string;
+    code?: LoginErrorCode;
+    message?: string;
+  };
+
+  if (!res.ok || !data.ok || !data.access || !data.refresh) {
+    const code = data.code ?? "user_not_found";
+    const message = data.message ?? (code === "password_incorrect" ? "Password incorrectly" : "User not found");
+    throw new LoginError(code, message);
+  }
+
+  // Сначала фиксируем предпочтение, затем пишем токены в нужное хранилище.
+  localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
+  writeStored(ACCESS_KEY, data.access);
+  writeStored(REFRESH_KEY, data.refresh);
+  writeStored(USERNAME_KEY, username);
   clearFeedCache();
   clearProfileTabsCache();
   emitAuthChanged();
-  return data;
+  return { access: data.access, refresh: data.refresh };
+}
+
+export interface RegisterFieldErrors {
+  username?: string;
+  email?: string;
+  password?: string;
+}
+
+export class RegisterError extends Error {
+  fields: RegisterFieldErrors;
+
+  constructor(fields: RegisterFieldErrors) {
+    super("Registration failed");
+    this.name = "RegisterError";
+    this.fields = fields;
+  }
 }
 
 export async function register(username: string, email: string, password: string) {
-  return apiFetch("/api/v1/auth/register/", {
-    method: "POST",
-    body: JSON.stringify({ username, email, password }),
-  });
+  // Бэкенд отдаёт 200 с {ok:false, errors} при невалидных полях (без 400 в консоли).
+  const data = await apiFetch<{ ok?: boolean; errors?: RegisterFieldErrors }>(
+    "/api/v1/auth/register/",
+    {
+      method: "POST",
+      body: JSON.stringify({ username, email, password }),
+    },
+  );
+  if (data && data.ok === false) {
+    throw new RegisterError(data.errors ?? {});
+  }
+  return data;
 }
 
 // --- Feed / Themes ---
@@ -286,8 +386,31 @@ export const getThread = (id: number | string) =>
 export const getReplyDetail = (id: number | string) =>
   apiFetch<{ reply: Reply; replies: Reply[] }>(`/api/v1/replies/${id}/`);
 
-export const createTheme = (body: string) =>
-  apiFetch<Theme>("/api/v1/themes/", { method: "POST", body: JSON.stringify({ body }) });
+interface CooldownPayload {
+  cooldown?: boolean;
+  retry_after?: number;
+  detail?: string;
+}
+
+// Сервер отдаёт кулдаун как 200 {cooldown:true,...} (чтобы браузер не сыпал 429
+// в консоль). Превращаем это в ошибку — её ловят формы и показывают отсчёт.
+function throwIfCooldown(data: unknown) {
+  const d = data as CooldownPayload | null;
+  if (d && d.cooldown) {
+    throw new Error(
+      d.detail ?? `You're posting too fast. Try again in ${d.retry_after ?? 0} seconds.`,
+    );
+  }
+}
+
+export const createTheme = async (body: string) => {
+  const data = await apiFetch<Theme | CooldownPayload>("/api/v1/themes/", {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+  throwIfCooldown(data);
+  return data as Theme;
+};
 
 export const toggleLike = (themeId: number) =>
   apiFetch<{ liked: boolean; likes_count: number }>(
@@ -306,11 +429,17 @@ export interface CreateReplyResponse extends Reply {
   parent_replies_count?: number;
 }
 
-export const createReply = (themeId: number, body: string, parentId?: number) =>
-  apiFetch<CreateReplyResponse>(`/api/v1/themes/${themeId}/replies/`, {
-    method: "POST",
-    body: JSON.stringify({ body, parent_id: parentId ?? null }),
-  });
+export const createReply = async (themeId: number, body: string, parentId?: number) => {
+  const data = await apiFetch<CreateReplyResponse | CooldownPayload>(
+    `/api/v1/themes/${themeId}/replies/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ body, parent_id: parentId ?? null }),
+    },
+  );
+  throwIfCooldown(data);
+  return data as CreateReplyResponse;
+};
 
 export const toggleReplyLike = (replyId: number) =>
   apiFetch<{ liked: boolean; likes_count: number }>(
@@ -482,7 +611,7 @@ async function apiFetchMultipart<T>(path: string, formData: FormData, retry = tr
   if (res.status === 401 && retry && !isServer) {
     const ok = await refreshAccessToken();
     if (ok) return apiFetchMultipart<T>(path, formData, false);
-    logout();
+    forceLogoutRedirect();
   }
 
   if (!res.ok) {

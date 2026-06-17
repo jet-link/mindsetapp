@@ -360,6 +360,35 @@ a { color: inherit; text-decoration: none; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--text); }
 .tabs button:disabled { cursor: default; opacity: 0.45; }
 
+/* Вкладки ленты (For you / Following) */
+.feed-tabs { margin-top: 4px; }
+
+/* Призыв войти для гостей — закреплён снизу ленты */
+.login-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 16px;
+  padding: 14px 8px calc(14px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.login-cta__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.login-cta__text { color: var(--text-dim); font-size: 14px; text-align: center; }
+.login-cta__actions { display: flex; gap: 8px; flex: 0 0 auto; }
+@media (max-width: 820px) {
+  .login-cta { bottom: 58px; }
+  .login-cta__inner { flex-direction: column; align-items: stretch; text-align: center; }
+  /* На мобильных кнопки Log in / Sign up — по 50% ширины */
+  .login-cta__actions { width: 100%; }
+  .login-cta__actions .btn { flex: 1 1 0; text-align: center; }
+}
+
 /* Threads-раскладка: колонка-аватар слева, контент справа.
    Имя и сразу под ним текст, кнопки строго под текстом. */
 .card {
@@ -390,7 +419,7 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 2px;
+  /* margin-bottom: 2px; */
 }
 .card-head__meta {
   display: flex;
@@ -490,8 +519,9 @@ a { color: inherit; text-decoration: none; }
 
 .body-html { word-wrap: break-word; }
 .body-html p { margin: 0 0 8px; }
-.body-html a.primary_ { color: var(--link); }
-.body-html a.mindset-hashtag { color: var(--link); font-weight: 600; }
+.body-html a:not(.mindset-embed) { color: #54a0ff; }
+.body-html a.primary_ { color: #54a0ff; }
+.body-html a.mindset-hashtag { color: #54a0ff; font-weight: 600; }
 
 .mindset-embed { position: relative; display: block; max-width: 420px; margin-top: 8px; }
 .mindset-embed__poster { width: 100%; border-radius: 12px; display: block; }
@@ -875,6 +905,26 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .form-page input:focus { outline: 2px solid #b9b9b9; }
 
+/* "Remember me" — компактный чекбокс, а не full-width input */
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  margin: 10px 0;
+}
+.remember-me input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+
 /* Скрыто визуально, но видно скринридерам и DevTools-аудиту */
 .sr-only {
   position: absolute;
@@ -896,7 +946,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .form-page input.input-error:focus { outline: 2px solid var(--error); }
 .form-page input.input-error::placeholder { color: var(--error); }
 
-.error { color: var(--error); font-size: 13px; white-space: pre-wrap; }
+.error { color: var(--error); font-size: 13px; white-space: pre-wrap; font-weight: 600; }
 .muted { color: var(--text-dim); text-align: center; padding: 32px 0; }
 
 .reply-indent { margin-left: 46px; }
@@ -907,9 +957,11 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .thread-chain {
   --thread-pad-x: 8px;
   --thread-avatar-size: 38px;
-  --thread-card-py: 8px;
-  --thread-gap: 7px;
-  /* padding: 10px 0; */
+  --thread-card-py: 16px;
+  /* --thread-card-py: 8px; */
+  --thread-gap: 15px;
+  /* --thread-gap: 7px; */
+  /* padding: 15px 0; */
 }
 .thread-chain .card {
   padding: var(--thread-card-py) var(--thread-pad-x);
@@ -959,7 +1011,8 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   text-align: center;
   font-weight: 700;
   font-size: 15px;
-  color: var(--text-dim);
+  /* color: var(--text-dim); */
+  color: #000000;
   line-height: 1.3;
 }
 
@@ -998,14 +1051,17 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .feed-list { transition: opacity 0.15s ease; }
 .feed-list--loading { opacity: 0.55; }
 
+/* Невидимый «сторож» для бесконечного скролла */
+.feed-sentinel { width: 100%; height: 1px; }
+
 /* Тулбар страницы: стрелка слева, заголовок по центру */
 .page-toolbar {
   position: relative;
   display: flex;
   align-items: center;
   min-height: 40px;
-  padding: 20px 4px 2px 10px;
-  margin-bottom: 15px;
+  padding: 20px 10px;
+  margin: 15px 0;
 }
 .page-title {
   position: absolute;
@@ -1111,7 +1167,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 /* @mentions в теле тем и в bio */
 .body-html a.mindset-mention,
 .profile-bio a.mindset-mention {
-  color: var(--link);
+  color: #54a0ff;
   font-weight: 600;
   text-decoration: none;
 }
@@ -1130,7 +1186,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .profile-edit-btn {
   cursor: pointer;
   display: inline-block;
-  margin-top: 10px;
+  margin-top: 14px;
   padding: 7px 14px;
   font: inherit;
   font-size: 14px;

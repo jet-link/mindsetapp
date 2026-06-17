@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import { getStoredUsername } from "@/lib/api";
 
 export default function ProfileHeader({ username }: { username: string }) {
   // Своя страница (открыта из sidenav) — без кнопки back.
@@ -9,7 +10,7 @@ export default function ProfileHeader({ username }: { username: string }) {
   const [showBack, setShowBack] = useState(false);
 
   useEffect(() => {
-    setShowBack(localStorage.getItem("mindset_username") !== username);
+    setShowBack(getStoredUsername() !== username);
   }, [username]);
 
   return <PageHeader title={username} showBack={showBack} />;

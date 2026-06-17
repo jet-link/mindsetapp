@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { emitFollowChanged, getProfile, isLoggedIn, logout, toggleFollow, AUTH_EVENT } from "@/lib/api";
+import { emitFollowChanged, getProfile, getStoredUsername, isLoggedIn, logout, toggleFollow, AUTH_EVENT } from "@/lib/api";
 
 export default function ProfileActions({
   username,
@@ -19,7 +19,7 @@ export default function ProfileActions({
   const router = useRouter();
 
   useEffect(() => {
-    const own = localStorage.getItem("mindset_username") === username;
+    const own = getStoredUsername() === username;
     setIsOwn(own);
     setAuthed(isLoggedIn());
     const onAuth = () => setAuthed(isLoggedIn());
@@ -48,7 +48,7 @@ export default function ProfileActions({
     try {
       const r = await toggleFollow(username);
       setFollowing(r.following);
-      const viewer = localStorage.getItem("mindset_username") ?? undefined;
+      const viewer = getStoredUsername() ?? undefined;
       emitFollowChanged({
         profileUsername: username,
         followers_count: r.followers_count,
@@ -69,7 +69,7 @@ export default function ProfileActions({
 
   function onLogout() {
     logout();
-    router.push("/");
+    router.push("/login");
   }
 
   return (

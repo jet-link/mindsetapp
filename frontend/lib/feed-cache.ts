@@ -6,18 +6,37 @@ export type FeedSnapshot = {
   scrollY: number;
 };
 
-let feedCache: FeedSnapshot | null = null;
+// Лента threads-стиля имеет несколько вкладок (for-you / following), поэтому
+// кэш храним по ключу вкладки, чтобы при переключении не терять прокрутку.
+const feedCaches: Record<string, FeedSnapshot> = {};
+let lastTab = "for-you";
 
-export function getFeedCache(): FeedSnapshot | null {
-  return feedCache;
+export function getLastFeedTab(): string {
+  return lastTab;
 }
 
-export function setFeedCache(snapshot: FeedSnapshot | null) {
-  feedCache = snapshot;
+export function setLastFeedTab(tab: string) {
+  lastTab = tab;
+}
+
+export function getFeedCache(tab: string = lastTab): FeedSnapshot | null {
+  return feedCaches[tab] ?? null;
+}
+
+export function setFeedCache(tab: string, snapshot: FeedSnapshot | null) {
+  if (snapshot === null) {
+    delete feedCaches[tab];
+  } else {
+    feedCaches[tab] = snapshot;
+  }
 }
 
 export function clearFeedCache() {
-  feedCache = null;
+  for (const key of Object.keys(feedCaches)) delete feedCaches[key];
+}
+
+function updateAllCaches(fn: (snapshot: FeedSnapshot) => void) {
+  for (const snapshot of Object.values(feedCaches)) fn(snapshot);
 }
 
 export function updateThemeLikeInFeedCache(
@@ -25,10 +44,11 @@ export function updateThemeLikeInFeedCache(
   liked: boolean,
   likesCount: number,
 ) {
-  if (!feedCache) return;
-  feedCache.themes = feedCache.themes.map((t) =>
-    t.id === themeId ? { ...t, is_liked: liked, likes_count: likesCount } : t,
-  );
+  updateAllCaches((c) => {
+    c.themes = c.themes.map((t) =>
+      t.id === themeId ? { ...t, is_liked: liked, likes_count: likesCount } : t,
+    );
+  });
 }
 
 export function updateThemeRepostInFeedCache(
@@ -36,32 +56,34 @@ export function updateThemeRepostInFeedCache(
   reposted: boolean,
   repostsCount: number,
 ) {
-  if (!feedCache) return;
-  feedCache.themes = feedCache.themes.map((t) =>
-    t.id === themeId ? { ...t, is_reposted: reposted, reposts_count: repostsCount } : t,
-  );
+  updateAllCaches((c) => {
+    c.themes = c.themes.map((t) =>
+      t.id === themeId ? { ...t, is_reposted: reposted, reposts_count: repostsCount } : t,
+    );
+  });
 }
 
 export function prependThemeToFeedCache(theme: Theme) {
-  if (!feedCache) {
-    feedCache = { themes: [], nextCursor: null, scrollY: 0 };
-  }
-  if (feedCache.themes.some((t) => t.id === theme.id)) return;
-  feedCache.themes = [theme, ...feedCache.themes];
+  updateAllCaches((c) => {
+    if (c.themes.some((t) => t.id === theme.id)) return;
+    c.themes = [theme, ...c.themes];
+  });
 }
 
 export function updateThemeRepliesInFeedCache(themeId: number, repliesCount: number) {
-  if (!feedCache) return;
-  feedCache.themes = feedCache.themes.map((t) =>
-    t.id === themeId ? { ...t, replies_count: repliesCount } : t,
-  );
+  updateAllCaches((c) => {
+    c.themes = c.themes.map((t) =>
+      t.id === themeId ? { ...t, replies_count: repliesCount } : t,
+    );
+  });
 }
 
 export function updateAuthorAvatarInFeedCache(username: string, avatar: string | null) {
-  if (!feedCache) return;
-  feedCache.themes = feedCache.themes.map((t) =>
-    t.author.username === username
-      ? { ...t, author: { ...t.author, avatar } }
-      : t,
-  );
+  updateAllCaches((c) => {
+    c.themes = c.themes.map((t) =>
+      t.author.username === username
+        ? { ...t, author: { ...t.author, avatar } }
+        : t,
+    );
+  });
 }

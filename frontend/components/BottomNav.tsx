@@ -8,6 +8,7 @@ import {
   NOTIFICATION_EVENT,
   getUnreadNotificationsCount,
   isLoggedIn,
+  getStoredUsername,
 } from "@/lib/api";
 import NavProfileLink from "@/components/NavProfileLink";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
@@ -23,7 +24,7 @@ export default function BottomNav() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    const syncAuth = () => setUsername(localStorage.getItem("mindset_username"));
+    const syncAuth = () => setUsername(getStoredUsername());
     syncAuth();
     window.addEventListener(AUTH_EVENT, syncAuth);
     return () => window.removeEventListener(AUTH_EVENT, syncAuth);

@@ -10,6 +10,12 @@ class CreatedAtCursorPagination(CursorPagination):
     cursor_query_param = 'cursor'
 
 
+class FeedCursorPagination(CreatedAtCursorPagination):
+    """Лента threads-стиля: первая порция в 50 постов под бесконечный скролл."""
+
+    page_size = 50
+
+
 class IdCursorPagination(CursorPagination):
     """Курсорная пагинация по id — для списков без поля created_at (например User)."""
 

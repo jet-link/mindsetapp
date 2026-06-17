@@ -11,10 +11,12 @@ import {
   emitFollowChanged,
   getFollowers,
   getFollowing,
+  getStoredUsername,
   isLoggedIn,
   toggleFollow,
 } from "@/lib/api";
 import { patchUserPublicList } from "@/lib/user-avatar-store";
+import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 
 function UserRow({ user }: { user: UserPublic }) {
   const [following, setFollowing] = useState(!!user.is_following);
@@ -23,7 +25,7 @@ function UserRow({ user }: { user: UserPublic }) {
 
   useEffect(() => {
     setAuthed(isLoggedIn());
-    setIsOwn(localStorage.getItem("mindset_username") === user.username);
+    setIsOwn(getStoredUsername() === user.username);
     const onAuth = () => setAuthed(isLoggedIn());
     window.addEventListener(AUTH_EVENT, onAuth);
     return () => window.removeEventListener(AUTH_EVENT, onAuth);
@@ -35,7 +37,7 @@ function UserRow({ user }: { user: UserPublic }) {
     try {
       const r = await toggleFollow(user.username);
       setFollowing(r.following);
-      const viewer = localStorage.getItem("mindset_username") ?? undefined;
+      const viewer = getStoredUsername() ?? undefined;
       emitFollowChanged({
         profileUsername: user.username,
         followers_count: r.followers_count,
@@ -166,6 +168,15 @@ export default function FollowList({
     return () => window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
   }, []);
 
+  const canLoadMore = !!nextCursor && !query.trim();
+  const sentinelRef = useInfiniteScroll({
+    hasMore: canLoadMore,
+    loading: fetching,
+    onLoadMore: () => {
+      if (nextCursor) load("", nextCursor);
+    },
+  });
+
   const showEmpty =
     !initialLoading && !fetching && users.length === 0 && !error;
 
@@ -211,12 +222,17 @@ export default function FollowList({
         ))}
       </div>
 
-      {nextCursor && !fetching && !query.trim() && (
-        <p className="muted">
-          <button type="button" className="link-btn" onClick={() => load("", nextCursor)}>
-            Show more
-          </button>
-        </p>
+      {canLoadMore && (
+        <>
+          <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
+          {!fetching && (
+            <p className="muted">
+              <button type="button" className="link-btn" onClick={() => load("", nextCursor!)}>
+                Show more
+              </button>
+            </p>
+          )}
+        </>
       )}
     </div>
   );

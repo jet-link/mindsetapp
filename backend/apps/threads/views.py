@@ -11,6 +11,12 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.pagination import FeedCursorPagination
+from apps.core.throttling import (
+    REPLY_COOLDOWN,
+    THEME_COOLDOWN,
+    cooldown_retry_after,
+)
 from apps.follows.models import Follow
 
 from . import services
@@ -33,6 +39,17 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+def _cooldown_response(wait: int, verb: str) -> Response:
+    """200-ответ о кулдауне (без 429 в консоли браузера). Фронт читает retry_after."""
+    unit = 'second' if wait == 1 else 'seconds'
+    return Response({
+        'ok': False,
+        'cooldown': True,
+        'retry_after': wait,
+        'detail': f"You're {verb} too fast. Try again in {wait} {unit}.",
+    })
 
 
 def _viewer_context(request, themes: list[Theme]) -> dict:
@@ -90,6 +107,7 @@ class FeedView(generics.ListAPIView):
     """
 
     serializer_class = ThemeSerializer
+    pagination_class = FeedCursorPagination
 
     def get_queryset(self):
         qs = _theme_queryset()
@@ -149,6 +167,9 @@ class ThemeViewSet(viewsets.GenericViewSet):
         return get_object_or_404(_theme_queryset(), pk=self.kwargs['pk'])
 
     def create(self, request):
+        wait = cooldown_retry_after(request.user, **THEME_COOLDOWN)
+        if wait:
+            return _cooldown_response(wait, 'posting')
         ser = ThemeCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         images = request.FILES.getlist('images')
@@ -223,6 +244,9 @@ class ThemeViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def replies(self, request, pk=None):
+        wait = cooldown_retry_after(request.user, **REPLY_COOLDOWN)
+        if wait:
+            return _cooldown_response(wait, 'replying')
         theme = self.get_object()
         ser = ReplyCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)

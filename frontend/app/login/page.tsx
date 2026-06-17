@@ -2,30 +2,125 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, register } from "@/lib/api";
+import {
+  LoginError,
+  RegisterError,
+  RegisterFieldErrors,
+  login,
+  register,
+} from "@/lib/api";
+
+type AuthErrorKind = "user_not_found" | "password_incorrect" | null;
+type RegisterField = keyof RegisterFieldErrors;
 
 export default function LoginPage() {
   useEffect(() => {
     document.title = "Log in | Mindset";
+    // Из CTA-баннера гостя ведём сразу в режим регистрации (?mode=signup).
+    const mode = new URLSearchParams(window.location.search).get("mode");
+    if (mode === "signup" || mode === "register") setMode("register");
   }, []);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
-  const [touched, setTouched] = useState(false);
+  const [authErrorKind, setAuthErrorKind] = useState<AuthErrorKind>(null);
+  const [registerErrors, setRegisterErrors] = useState<RegisterFieldErrors>({});
+  const [showEmptyErrors, setShowEmptyErrors] = useState(false);
   const router = useRouter();
 
-  const usernameMissing = touched && !username.trim();
-  const emailMissing = touched && mode === "register" && !email.trim();
-  const passwordMissing = touched && !password;
+  const usernameMissing = showEmptyErrors && !username.trim();
+  const emailMissing = showEmptyErrors && mode === "register" && !email.trim();
+  const passwordMissing = showEmptyErrors && !password;
+
+  const usernameInvalid =
+    usernameMissing ||
+    (mode === "login" && authErrorKind === "user_not_found") ||
+    (mode === "register" && !!registerErrors.username);
+  const emailInvalid =
+    emailMissing || (mode === "register" && !!registerErrors.email);
+  const passwordInvalid =
+    passwordMissing ||
+    (mode === "login" &&
+      (authErrorKind === "user_not_found" || authErrorKind === "password_incorrect")) ||
+    (mode === "register" && !!registerErrors.password);
+
+  const registerMessages = Object.values(registerErrors).filter(Boolean);
+  const errorText =
+    mode === "register"
+      ? registerMessages.length
+        ? registerMessages.join("\n")
+        : error
+      : error;
+
+  function clearAllErrors() {
+    setAuthErrorKind(null);
+    setRegisterErrors({});
+    setError("");
+    setShowEmptyErrors(false);
+  }
+
+  function clearRegisterField(field: RegisterField) {
+    setRegisterErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function onUsernameChange(value: string) {
+    setUsername(value);
+    if (mode === "register") {
+      clearRegisterField("username");
+      return;
+    }
+    if (authErrorKind === "password_incorrect") {
+      clearAllErrors();
+      return;
+    }
+    if (authErrorKind === "user_not_found" && value.trim()) {
+      clearAllErrors();
+    }
+  }
+
+  function onEmailChange(value: string) {
+    setEmail(value);
+    clearRegisterField("email");
+  }
+
+  function onPasswordChange(value: string) {
+    setPassword(value);
+    if (mode === "register") {
+      clearRegisterField("password");
+      return;
+    }
+    if (authErrorKind === "password_incorrect") {
+      clearAllErrors();
+      return;
+    }
+    if (authErrorKind === "user_not_found" && value) {
+      clearAllErrors();
+    }
+  }
+
+  function toggleMode() {
+    // Каждый переход login <-> register должен быть чистым.
+    setMode(mode === "login" ? "register" : "login");
+    setUsername("");
+    setEmail("");
+    setPassword("");
+    clearAllErrors();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setTouched(true);
+    setAuthErrorKind(null);
+    setRegisterErrors({});
     setError("");
-    // Клиентская валидация: пустые поля только подсвечиваем красным,
-    // без текстовой подсказки под полями.
+    setShowEmptyErrors(true);
     if (!username.trim() || !password || (mode === "register" && !email.trim())) {
       return;
     }
@@ -33,10 +128,19 @@ export default function LoginPage() {
       if (mode === "register") {
         await register(username, email, password);
       }
-      await login(username, password);
+      await login(username, password, remember);
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      if (mode === "login" && err instanceof LoginError) {
+        setAuthErrorKind(err.code);
+        setError(err.message);
+        setShowEmptyErrors(false);
+      } else if (mode === "register" && err instanceof RegisterError) {
+        setRegisterErrors(err.fields);
+        setShowEmptyErrors(false);
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      }
     }
   }
 
@@ -44,7 +148,6 @@ export default function LoginPage() {
     <form className="form-page" onSubmit={submit} noValidate>
       <h1>{mode === "login" ? "Log in" : "Sign up"}</h1>
 
-      {/* sr-only: метки скрыты визуально, но доступны скринридерам и аудиту */}
       <label className="sr-only" htmlFor="login-username">
         Username
       </label>
@@ -53,10 +156,10 @@ export default function LoginPage() {
         name="username"
         placeholder="Username"
         value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        onChange={(e) => onUsernameChange(e.target.value)}
         autoComplete="username"
-        className={usernameMissing ? "input-error" : ""}
-        aria-invalid={usernameMissing}
+        className={usernameInvalid ? "input-error" : ""}
+        aria-invalid={usernameInvalid}
       />
 
       {mode === "register" && (
@@ -70,10 +173,10 @@ export default function LoginPage() {
             placeholder="Email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => onEmailChange(e.target.value)}
             autoComplete="email"
-            className={emailMissing ? "input-error" : ""}
-            aria-invalid={emailMissing}
+            className={emailInvalid ? "input-error" : ""}
+            aria-invalid={emailInvalid}
           />
         </>
       )}
@@ -87,15 +190,26 @@ export default function LoginPage() {
         placeholder="Password"
         type="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => onPasswordChange(e.target.value)}
         autoComplete={mode === "login" ? "current-password" : "new-password"}
-        className={passwordMissing ? "input-error" : ""}
-        aria-invalid={passwordMissing}
+        className={passwordInvalid ? "input-error" : ""}
+        aria-invalid={passwordInvalid}
       />
 
-      {error && (
+      {mode === "login" && (
+        <label className="remember-me">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          <span>Remember me</span>
+        </label>
+      )}
+
+      {errorText && (
         <div className="error" role="alert">
-          {error}
+          {errorText}
         </div>
       )}
 
@@ -106,11 +220,7 @@ export default function LoginPage() {
         type="button"
         className="btn btn--ghost"
         style={{ alignSelf: "stretch", textAlign: "center" }}
-        onClick={() => {
-          setMode(mode === "login" ? "register" : "login");
-          setTouched(false);
-          setError("");
-        }}
+        onClick={toggleMode}
       >
         {mode === "login" ? "No account? Sign up" : "Already have an account? Log in"}
       </button>

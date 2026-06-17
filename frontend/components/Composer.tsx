@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import { Theme, createTheme, emitThemeCreated, isLoggedIn } from "@/lib/api";
+import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
 import {
   THEME_BODY_LIMIT,
   normalizeThemeBody,
@@ -15,6 +16,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const cooldown = useCooldown();
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -53,7 +55,14 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
       emitThemeCreated(theme);
       onPosted?.(theme);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to publish");
+      const message = err instanceof Error ? err.message : "Failed to publish";
+      const secs = parseCooldownSeconds(message);
+      if (secs) {
+        cooldown.start(secs);
+        setError("");
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
@@ -76,7 +85,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
           <button
             className="btn"
             type="submit"
-            disabled={busy || !body.trim() || overLimit}
+            disabled={busy || !body.trim() || overLimit || cooldown.active}
           >
             Post
           </button>
@@ -85,9 +94,13 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
           </button>
         </div>
         <div className="composer-meta">
-          <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
-            {chars}/{THEME_BODY_LIMIT}
-          </span>
+          {cooldown.active ? (
+            <span className="bio-counter">You can post again in {cooldown.seconds}s</span>
+          ) : (
+            <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
+              {chars}/{THEME_BODY_LIMIT}
+            </span>
+          )}
         </div>
       </div>
       {error && (

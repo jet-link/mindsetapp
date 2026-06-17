@@ -8,6 +8,7 @@ import ProfileStats from "./profile-stats";
 import {
   deleteMeAvatar,
   emitUserProfileUpdated,
+  getStoredUsername,
   updateMeAvatar,
   updateMeBio,
 } from "@/lib/api";
@@ -39,7 +40,7 @@ export default function ProfileHead({
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setIsOwn(localStorage.getItem("mindset_username") === username);
+    setIsOwn(getStoredUsername() === username);
   }, [username]);
 
   useEffect(() => {

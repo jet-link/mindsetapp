@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import Composer from "@/components/Composer";
 import ThemeCard from "@/components/ThemeCard";
-import { Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getUserThemes, isLoggedIn } from "@/lib/api";
+import { Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getStoredUsername, getUserThemes, isLoggedIn } from "@/lib/api";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 const RECENT_THEMES_LIMIT = 10;
@@ -22,7 +22,7 @@ export default function ComposePage() {
       return;
     }
     setReady(true);
-    const username = localStorage.getItem("mindset_username");
+    const username = getStoredUsername();
     if (username) {
       getUserThemes(username)
         .then((p) => setRecent(p.results.slice(0, RECENT_THEMES_LIMIT)))

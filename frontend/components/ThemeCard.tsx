@@ -20,6 +20,7 @@ import {
   toggleLike,
   toggleRepost,
 } from "@/lib/api";
+import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchor } from "@/lib/return-anchor";
 
 
@@ -27,10 +28,12 @@ export default function ThemeCard({
   theme,
   clickable = true,
   threadLineBelow = false,
+  onRepostChange,
 }: {
   theme: Theme;
   clickable?: boolean;
   threadLineBelow?: boolean;
+  onRepostChange?: (themeId: number, reposted: boolean) => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
@@ -109,16 +112,22 @@ export default function ThemeCard({
       router.push("/login");
       return;
     }
+    const optimistic = !reposted;
+    setReposted(optimistic);
+    if (!optimistic) onRepostChange?.(theme.id, false);
     try {
       const r = await toggleRepost(theme.id);
       setReposted(r.reposted);
       setReposts(r.reposts_count);
+      if (r.reposted !== optimistic) onRepostChange?.(theme.id, r.reposted);
       emitThemeRepostChanged({
         themeId: theme.id,
         reposted: r.reposted,
         reposts_count: r.reposts_count,
       });
     } catch {
+      setReposted(!optimistic);
+      if (!optimistic) onRepostChange?.(theme.id, true);
       window.location.href = "/login";
     }
   }
@@ -179,16 +188,30 @@ export default function ThemeCard({
         )}
 
         <div className="actions">
-          <button type="button" className={liked ? "active" : ""} onClick={onLike}>
+          <button
+            type="button"
+            className={liked ? "active" : ""}
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onLike}
+          >
             <i className={`fa ${liked ? "fa-heart" : "fa-heart-o"}`} aria-hidden="true" />{" "}
             {formatCount(likes)}
           </button>
-          <button type="button" onClick={onReply}>
+          <button
+            type="button"
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onReply}
+          >
             <i className="fa fa-comment-o" aria-hidden="true" />{" "}
             {formatCount(replies)}
           </button>
-          <button type="button" className={reposted ? "active" : ""} onClick={onRepost}>
-            <i className="fa fa-retweet" aria-hidden="true" /> {formatCount(reposts)}
+          <button
+            type="button"
+            className={reposted ? "active" : ""}
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onRepost}
+          >
+            <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
           </button>
           {/* Share theme (bullhorn) — отключено, вернём позже
           <button type="button" aria-label="Share theme" onClick={onShare}>

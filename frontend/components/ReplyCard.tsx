@@ -20,6 +20,7 @@ import {
   toggleReplyLike,
   toggleReplyRepost,
 } from "@/lib/api";
+import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchor } from "@/lib/return-anchor";
 
 export default function ReplyCard({
@@ -169,16 +170,30 @@ export default function ReplyCard({
         />
 
         <div className="actions">
-          <button type="button" className={liked ? "active" : ""} onClick={onLike}>
+          <button
+            type="button"
+            className={liked ? "active" : ""}
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onLike}
+          >
             <i className={`fa ${liked ? "fa-heart" : "fa-heart-o"}`} aria-hidden="true" />{" "}
             {formatCount(likes)}
           </button>
-          <button type="button" onClick={onReplies}>
+          <button
+            type="button"
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onReplies}
+          >
             <i className="fa fa-comment-o" aria-hidden="true" />{" "}
             {formatCount(replies)}
           </button>
-          <button type="button" className={reposted ? "active" : ""} onClick={onRepost}>
-            <i className="fa fa-retweet" aria-hidden="true" /> {formatCount(reposts)}
+          <button
+            type="button"
+            className={reposted ? "active" : ""}
+            onPointerDown={(e) => bouncePress(e.currentTarget)}
+            onClick={onRepost}
+          >
+            <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
           </button>
           {showViewTheme && (
             <Link href={`/thread/${reply.theme_id}`} className="view-theme">

@@ -1,6 +1,6 @@
-/** Bounce-анимация для пунктов меню — Web Animations API,
-    чтобы эффект срабатывал с первого нажатия (до навигации). */
-export function bounceNavItem(el: HTMLElement) {
+/** Bounce-анимация на нажатие — Web Animations API,
+    чтобы эффект срабатывал с первого клика (до навигации). */
+export function bouncePress(el: HTMLElement) {
   el.getAnimations().forEach((a) => a.cancel());
   el.animate(
     [
@@ -12,3 +12,6 @@ export function bounceNavItem(el: HTMLElement) {
     { duration: 350, easing: "ease", fill: "none" },
   );
 }
+
+/** @deprecated use bouncePress */
+export const bounceNavItem = bouncePress;

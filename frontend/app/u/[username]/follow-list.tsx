@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
+import ListExitWrap from "@/components/ListExitWrap";
 import {
   UserPublic,
   AUTH_EVENT,
@@ -22,9 +23,13 @@ import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 
 function UserRow({
   user,
+  exiting,
+  onExitComplete,
   onFollowingChange,
 }: {
   user: UserPublic;
+  exiting?: boolean;
+  onExitComplete?: () => void;
   onFollowingChange?: (username: string, following: boolean) => void;
 }) {
   const [following, setFollowing] = useState(!!user.is_following);
@@ -63,25 +68,27 @@ function UserRow({
   }
 
   return (
-    <div className="user-row">
-      <Link href={`/u/${user.username}`} className="user-row__link">
-        <Avatar username={user.username} src={user.avatar} />
-        <div className="user-row__main">
-          <span className="username">{user.username}</span>
-          {user.bio && <span className="user-row__bio">{user.bio}</span>}
-        </div>
-      </Link>
+    <ListExitWrap exiting={exiting} onExitComplete={onExitComplete}>
+      <div className="user-row">
+        <Link href={`/u/${user.username}`} className="user-row__link">
+          <Avatar username={user.username} src={user.avatar} />
+          <div className="user-row__main">
+            <span className="username">{user.username}</span>
+            {user.bio && <span className="user-row__bio">{user.bio}</span>}
+          </div>
+        </Link>
 
-      {isOwn === false && authed && (
-        <button
-          type="button"
-          className={`btn btn--sm ${following ? "" : "btn--ghost"}`}
-          onClick={onToggle}
-        >
-          {following ? "Unfollow" : "Follow"}
-        </button>
-      )}
-    </div>
+        {isOwn === false && authed && (
+          <button
+            type="button"
+            className={`btn btn--sm ${following ? "" : "btn--ghost"}`}
+            onClick={onToggle}
+          >
+            {following ? "Unfollow" : "Follow"}
+          </button>
+        )}
+      </div>
+    </ListExitWrap>
   );
 }
 
@@ -103,6 +110,7 @@ export default function FollowList({
   const cacheRef = useRef<Map<string, UserPublic[]>>(new Map());
   const usersRef = useRef<UserPublic[]>([]);
   const removedRef = useRef<Map<string, UserPublic>>(new Map());
+  const [exitingUsernames, setExitingUsernames] = useState<Set<string>>(() => new Set());
 
   const patchCache = useCallback((list: UserPublic[]) => {
     for (const key of cacheRef.current.keys()) {
@@ -122,8 +130,41 @@ export default function FollowList({
         patchCache(next);
         return next;
       });
+      setExitingUsernames((prev) => {
+        if (!prev.has(profileUsername)) return prev;
+        const next = new Set(prev);
+        next.delete(profileUsername);
+        return next;
+      });
     },
     [patchCache],
+  );
+
+  const beginExit = useCallback((profileUsername: string) => {
+    setExitingUsernames((prev) => {
+      if (prev.has(profileUsername)) return prev;
+      const next = new Set(prev);
+      next.add(profileUsername);
+      return next;
+    });
+  }, []);
+
+  const cancelExit = useCallback((profileUsername: string) => {
+    setExitingUsernames((prev) => {
+      if (!prev.has(profileUsername)) return prev;
+      const next = new Set(prev);
+      next.delete(profileUsername);
+      return next;
+    });
+  }, []);
+
+  const scheduleRemove = useCallback(
+    (profileUsername: string) => {
+      const isOwnFollowing = kind === "following" && username === getStoredUsername();
+      if (isOwnFollowing) beginExit(profileUsername);
+      else removeFromList(profileUsername);
+    },
+    [beginExit, kind, removeFromList, username],
   );
 
   const restoreToList = useCallback(
@@ -145,10 +186,14 @@ export default function FollowList({
   const handleFollowingChange = useCallback(
     (profileUsername: string, following: boolean) => {
       if (kind !== "following" || username !== getStoredUsername()) return;
-      if (following) restoreToList(profileUsername);
-      else removeFromList(profileUsername);
+      if (following) {
+        cancelExit(profileUsername);
+        restoreToList(profileUsername);
+      } else {
+        scheduleRemove(profileUsername);
+      }
     },
-    [kind, username, removeFromList, restoreToList],
+    [cancelExit, kind, restoreToList, scheduleRemove, username],
   );
 
   const load = useCallback(
@@ -228,7 +273,7 @@ export default function FollowList({
       const { profileUsername, following } = (e as CustomEvent<FollowChangedDetail>).detail;
       if (kind !== "following" || following !== false) return;
       if (username !== getStoredUsername()) return;
-      removeFromList(profileUsername);
+      scheduleRemove(profileUsername);
     };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     window.addEventListener(FOLLOW_EVENT, onFollow);
@@ -236,7 +281,7 @@ export default function FollowList({
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
       window.removeEventListener(FOLLOW_EVENT, onFollow);
     };
-  }, [kind, username, removeFromList]);
+  }, [kind, scheduleRemove, username]);
 
   const canLoadMore = !!nextCursor && !query.trim();
   const sentinelRef = useInfiniteScroll({
@@ -288,7 +333,13 @@ export default function FollowList({
 
       <div className={`follow-list${fetching ? " follow-list--fetching" : ""}`}>
         {users.map((u) => (
-          <UserRow key={u.id} user={u} onFollowingChange={handleFollowingChange} />
+          <UserRow
+            key={u.id}
+            user={u}
+            exiting={exitingUsernames.has(u.username)}
+            onExitComplete={() => removeFromList(u.username)}
+            onFollowingChange={handleFollowingChange}
+          />
         ))}
       </div>
 

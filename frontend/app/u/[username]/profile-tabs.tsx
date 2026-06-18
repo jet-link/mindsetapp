@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import ReplyCard from "@/components/ReplyCard";
+import ListExitWrap from "@/components/ListExitWrap";
 import ThemeCard from "@/components/ThemeCard";
 import {
   AUTH_EVENT,
@@ -18,6 +19,7 @@ import {
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
+  getStoredUsername,
   getUserMedia,
   getUserReplies,
   getUserReposts,
@@ -126,8 +128,54 @@ export default function ProfileTabs({
   const lockedScrollY = useRef<number | null>(null);
   const scrollLocked = useRef(false);
   const programmaticScroll = useRef(false);
+  const [exitingRepostIds, setExitingRepostIds] = useState<Set<number>>(() => new Set());
 
   slicesRef.current = slices;
+
+  const removeRepostFromSlice = useCallback((themeId: number) => {
+    setSlices((prev) =>
+      mapSlices(prev, (slice, tabId) => {
+        if (tabId !== "reposts") return slice;
+        return { ...slice, themes: slice.themes.filter((t) => t.id !== themeId) };
+      }),
+    );
+    setExitingRepostIds((prev) => {
+      if (!prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.delete(themeId);
+      return next;
+    });
+  }, []);
+
+  const cancelRepostRemove = useCallback((themeId: number) => {
+    setExitingRepostIds((prev) => {
+      if (!prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.delete(themeId);
+      return next;
+    });
+  }, []);
+
+  const scheduleRepostRemove = useCallback(
+    (themeId: number) => {
+      if (username !== getStoredUsername()) return;
+      setExitingRepostIds((prev) => {
+        if (prev.has(themeId)) return prev;
+        const next = new Set(prev);
+        next.add(themeId);
+        return next;
+      });
+    },
+    [username],
+  );
+
+  const handleRepostChange = useCallback(
+    (themeId: number, reposted: boolean) => {
+      if (reposted) cancelRepostRemove(themeId);
+      else scheduleRepostRemove(themeId);
+    },
+    [cancelRepostRemove, scheduleRepostRemove],
+  );
 
   const applyScrollFloor = useCallback(() => {
     const el = panelsRef.current;
@@ -240,12 +288,14 @@ export default function ProfileTabs({
       setTab(cached.tab);
       setSlices(cached.slices);
       setLoadingTab(cached.slices[cached.tab].loaded ? null : cached.tab);
+      setExitingRepostIds(new Set());
       setError("");
       return;
     }
     setTab("themes");
     setSlices(emptySlices());
     setLoadingTab("themes");
+    setExitingRepostIds(new Set());
     setError("");
     window.scrollTo(0, 0);
   }, [username, unlockScroll]);
@@ -368,13 +418,14 @@ export default function ProfileTabs({
     };
     const onThemeRepost = (e: Event) => {
       const { themeId, reposted, reposts_count } = (e as CustomEvent<ThemeRepostDetail>).detail;
+      const isOwnProfile = username === getStoredUsername();
+      if (!reposted && isOwnProfile) {
+        scheduleRepostRemove(themeId);
+      }
       setSlices((prev) =>
         mapSlices(prev, (slice, tabId) => {
           if (tabId === "reposts" && !reposted) {
-            return {
-              ...slice,
-              themes: slice.themes.filter((t) => t.id !== themeId),
-            };
+            return slice;
           }
           return {
             ...slice,
@@ -449,7 +500,7 @@ export default function ProfileTabs({
       window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
       window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
     };
-  }, []);
+  }, [scheduleRepostRemove, username]);
 
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
@@ -531,9 +582,19 @@ export default function ProfileTabs({
                         </div>
                       </div>
                     ))
-                  : slice.themes.map((t) => (
-                      <ThemeCard key={`${tabId}-${t.id}`} theme={t} />
-                    ))}
+                  : tabId === "reposts"
+                    ? slice.themes.map((t) => (
+                        <ListExitWrap
+                          key={`${tabId}-${t.id}`}
+                          exiting={exitingRepostIds.has(t.id)}
+                          onExitComplete={() => removeRepostFromSlice(t.id)}
+                        >
+                          <ThemeCard theme={t} onRepostChange={handleRepostChange} />
+                        </ListExitWrap>
+                      ))
+                    : slice.themes.map((t) => (
+                        <ThemeCard key={`${tabId}-${t.id}`} theme={t} />
+                      ))}
               </div>
 
               {isActive && isLoading && items.length === 0 && (

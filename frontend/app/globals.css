@@ -587,6 +587,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 15px;
   padding: 8px 14px;
   border-radius: 999px;
+  transform-origin: center;
 }
 .actions button .fa { font-size: 18px; }
 .actions button:hover { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
@@ -961,6 +962,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   margin: 0;
   accent-color: var(--text);
   cursor: pointer;
+  outline: none;
 }
 
 /* Скрыто визуально, но видно скринридерам и DevTools-аудиту */
@@ -1066,6 +1068,40 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   gap: 12px;
   padding: 12px 0;
   /* border-bottom: 1px solid var(--border); */
+}
+
+/* Исчезновение элемента списка вверх (Following, Reposts и т.п.) */
+.list-exit {
+  overflow: hidden;
+}
+.list-exit--active {
+  animation: list-exit-up 0.32s ease forwards;
+  pointer-events: none;
+}
+@keyframes list-exit-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: var(--exit-max, 120px);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-24px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-exit--active {
+    animation: list-exit-up-reduced 0.15s ease forwards;
+  }
+  @keyframes list-exit-up-reduced {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
 }
 /* .user-row:hover { background: var(--surface); } */
 .user-row__link {

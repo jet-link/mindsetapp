@@ -6,6 +6,8 @@ import Avatar from "@/components/Avatar";
 import {
   UserPublic,
   AUTH_EVENT,
+  FOLLOW_EVENT,
+  FollowChangedDetail,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
   emitFollowChanged,
@@ -18,7 +20,13 @@ import {
 import { patchUserPublicList } from "@/lib/user-avatar-store";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 
-function UserRow({ user }: { user: UserPublic }) {
+function UserRow({
+  user,
+  onFollowingChange,
+}: {
+  user: UserPublic;
+  onFollowingChange?: (username: string, following: boolean) => void;
+}) {
   const [following, setFollowing] = useState(!!user.is_following);
   const [isOwn, setIsOwn] = useState<boolean | null>(null);
   const [authed, setAuthed] = useState(false);
@@ -34,9 +42,11 @@ function UserRow({ user }: { user: UserPublic }) {
   async function onToggle() {
     const optimistic = !following;
     setFollowing(optimistic);
+    if (!optimistic) onFollowingChange?.(user.username, false);
     try {
       const r = await toggleFollow(user.username);
       setFollowing(r.following);
+      if (r.following !== optimistic) onFollowingChange?.(user.username, r.following);
       const viewer = getStoredUsername() ?? undefined;
       emitFollowChanged({
         profileUsername: user.username,
@@ -47,6 +57,7 @@ function UserRow({ user }: { user: UserPublic }) {
       });
     } catch {
       setFollowing(!optimistic);
+      if (!optimistic) onFollowingChange?.(user.username, true);
       window.location.href = "/login";
     }
   }
@@ -91,6 +102,54 @@ export default function FollowList({
   const requestIdRef = useRef(0);
   const cacheRef = useRef<Map<string, UserPublic[]>>(new Map());
   const usersRef = useRef<UserPublic[]>([]);
+  const removedRef = useRef<Map<string, UserPublic>>(new Map());
+
+  const patchCache = useCallback((list: UserPublic[]) => {
+    for (const key of cacheRef.current.keys()) {
+      if (key.startsWith(`${kind}:${username}:`)) {
+        cacheRef.current.set(key, list);
+      }
+    }
+  }, [kind, username]);
+
+  const removeFromList = useCallback(
+    (profileUsername: string) => {
+      setUsers((prev) => {
+        const removed = prev.find((u) => u.username === profileUsername);
+        if (removed) removedRef.current.set(profileUsername, removed);
+        const next = prev.filter((u) => u.username !== profileUsername);
+        usersRef.current = next;
+        patchCache(next);
+        return next;
+      });
+    },
+    [patchCache],
+  );
+
+  const restoreToList = useCallback(
+    (profileUsername: string) => {
+      const user = removedRef.current.get(profileUsername);
+      if (!user) return;
+      removedRef.current.delete(profileUsername);
+      setUsers((prev) => {
+        if (prev.some((u) => u.username === profileUsername)) return prev;
+        const next = [...prev, user];
+        usersRef.current = next;
+        patchCache(next);
+        return next;
+      });
+    },
+    [patchCache],
+  );
+
+  const handleFollowingChange = useCallback(
+    (profileUsername: string, following: boolean) => {
+      if (kind !== "following" || username !== getStoredUsername()) return;
+      if (following) restoreToList(profileUsername);
+      else removeFromList(profileUsername);
+    },
+    [kind, username, removeFromList, restoreToList],
+  );
 
   const load = useCallback(
     async (q: string, cursor?: string) => {
@@ -165,9 +224,19 @@ export default function FollowList({
         cacheRef.current.set(key, patchUserPublicList(list, changed, avatar));
       }
     };
+    const onFollow = (e: Event) => {
+      const { profileUsername, following } = (e as CustomEvent<FollowChangedDetail>).detail;
+      if (kind !== "following" || following !== false) return;
+      if (username !== getStoredUsername()) return;
+      removeFromList(profileUsername);
+    };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
-    return () => window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
-  }, []);
+    window.addEventListener(FOLLOW_EVENT, onFollow);
+    return () => {
+      window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+      window.removeEventListener(FOLLOW_EVENT, onFollow);
+    };
+  }, [kind, username, removeFromList]);
 
   const canLoadMore = !!nextCursor && !query.trim();
   const sentinelRef = useInfiniteScroll({
@@ -219,7 +288,7 @@ export default function FollowList({
 
       <div className={`follow-list${fetching ? " follow-list--fetching" : ""}`}>
         {users.map((u) => (
-          <UserRow key={u.id} user={u} />
+          <UserRow key={u.id} user={u} onFollowingChange={handleFollowingChange} />
         ))}
       </div>
 

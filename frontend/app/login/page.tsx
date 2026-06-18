@@ -9,13 +9,14 @@ import {
   login,
   register,
 } from "@/lib/api";
+import { setPageTitle } from "@/components/RouteTitle";
 
 type AuthErrorKind = "user_not_found" | "password_incorrect" | null;
 type RegisterField = keyof RegisterFieldErrors;
 
 export default function LoginPage() {
   useEffect(() => {
-    document.title = "Log in | Mindset";
+    setPageTitle("Log in");
     // Из CTA-баннера гостя ведём сразу в режим регистрации (?mode=signup).
     const mode = new URLSearchParams(window.location.search).get("mode");
     if (mode === "signup" || mode === "register") setMode("register");

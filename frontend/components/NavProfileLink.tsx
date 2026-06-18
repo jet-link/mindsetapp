@@ -17,6 +17,7 @@ type NavProfileLinkProps = {
   active: boolean;
   className: string;
   onPointerDown?: (e: React.PointerEvent<HTMLAnchorElement>) => void;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 };
 
 export default function NavProfileLink({
@@ -25,6 +26,7 @@ export default function NavProfileLink({
   active,
   className,
   onPointerDown,
+  onClick,
 }: NavProfileLinkProps) {
   const [avatar, setAvatar] = useState<string | null>(null);
 
@@ -82,6 +84,7 @@ export default function NavProfileLink({
       aria-label="Profile"
       aria-current={active ? "page" : undefined}
       onPointerDown={onPointerDown}
+      onClick={onClick}
     >
       {username ? (
         <span className="nav-profile-avatar">

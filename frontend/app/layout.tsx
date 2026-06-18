@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import BottomNav from "@/components/BottomNav";
 import MentionHoverLayer from "@/components/MentionHoverLayer";
 import MobileHeader from "@/components/MobileHeader";
+import RouteTitle from "@/components/RouteTitle";
 import SideNav from "@/components/SideNav";
 import "./globals.css";
 
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body suppressHydrationWarning>
+        <RouteTitle />
         <MobileHeader />
         <SideNav />
         <div className="shell">{children}</div>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { setMobileBackVisible } from "@/lib/mobile-back";
+import { setPageTitle } from "@/components/RouteTitle";
 import BackButton from "./BackButton";
 
 export default function PageHeader({
@@ -12,7 +13,7 @@ export default function PageHeader({
   showBack?: boolean;
 }) {
   useEffect(() => {
-    if (title) document.title = `${title} | Mindset`;
+    if (title) setPageTitle(title);
   }, [title]);
 
   useEffect(() => {

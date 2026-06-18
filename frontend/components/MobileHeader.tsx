@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import BackButton from "@/components/BackButton";
+import { scheduleHomePageTitle } from "@/components/RouteTitle";
 import {
   getMobileBackVisible,
   subscribeMobileBack,
@@ -21,9 +22,16 @@ export default function MobileHeader() {
       <div className="mobile-header__start">
         {showBack && <BackButton className="mobile-header__back" />}
       </div>
-      <Link href="/" className="mobile-header__logo" aria-label="Mindset">
-        <span className="logo-mind">Mind</span>
-        <span className="logo-set">set</span>
+      <Link
+        href="/"
+        className="mobile-header__logo"
+        aria-label="Mindset"
+        onClick={scheduleHomePageTitle}
+      >
+        <span className="logo-word">
+          <span className="logo-mind">Mind</span>
+          <span className="logo-set">set</span>
+        </span>
       </Link>
       <div className="mobile-header__end" aria-hidden="true" />
     </header>

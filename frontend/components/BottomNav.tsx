@@ -11,10 +11,13 @@ import {
   getStoredUsername,
 } from "@/lib/api";
 import NavProfileLink from "@/components/NavProfileLink";
+import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/RouteTitle";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 
+const AUTH_REQUIRED_HREFS = new Set(["/compose", "/notifications"]);
+
 function navHref(item: NavItem, username: string | null): string {
-  if (item.href === "/compose" && !username) return "/login";
+  if (AUTH_REQUIRED_HREFS.has(item.href) && !username) return "/login";
   return item.href;
 }
 
@@ -60,8 +63,9 @@ export default function BottomNav() {
     <nav className="bottomnav" aria-label="Main navigation">
       {NAV_ITEMS.map((it) => {
         if (it.authOnly && !username) return null;
-        const active = pathname === it.href;
         const href = navHref(it, username);
+        const active = pathname === it.href;
+        const isCurrent = pathname === href;
         return (
           <Link
             key={it.href}
@@ -69,6 +73,13 @@ export default function BottomNav() {
             className={`bottomnav__item${active ? " active" : ""}`}
             aria-label={it.label}
             title={it.label}
+            onClick={
+              it.href === "/"
+                ? scheduleHomePageTitle
+                : isCurrent
+                  ? scheduleApplyCurrentTitle
+                  : undefined
+            }
           >
             <span className="bottomnav__icon-wrap">
               <i className={`fa ${it.icon}`} aria-hidden="true" />
@@ -86,6 +97,7 @@ export default function BottomNav() {
         href={profileHref}
         active={profileActive}
         className="bottomnav__item"
+        onClick={profileActive ? scheduleApplyCurrentTitle : undefined}
       />
     </nav>
   );

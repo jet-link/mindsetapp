@@ -11,11 +11,14 @@ import {
   getStoredUsername,
 } from "@/lib/api";
 import NavProfileLink from "@/components/NavProfileLink";
+import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/RouteTitle";
 import { bounceNavItem } from "@/lib/nav-bounce";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 
+const AUTH_REQUIRED_HREFS = new Set(["/compose", "/notifications"]);
+
 function navHref(item: NavItem, username: string | null): string {
-  if (item.href === "/compose" && !username) return "/login";
+  if (AUTH_REQUIRED_HREFS.has(item.href) && !username) return "/login";
   return item.href;
 }
 
@@ -59,16 +62,25 @@ export default function SideNav() {
 
   return (
     <aside className="sidenav">
-      <Link href="/" className="sidenav__logo" title="Mindset" aria-label="Mindset">
-        <span className="logo-mind">M</span>
-        <span className="logo-set">s</span>
+      <Link
+        href="/"
+        className="sidenav__logo"
+        title="Mindset"
+        aria-label="Mindset"
+        onClick={scheduleHomePageTitle}
+      >
+        <span className="logo-word">
+          <span className="logo-mind">M</span>
+          <span className="logo-set">s</span>
+        </span>
       </Link>
 
       <nav className="sidenav__menu" aria-label="Main navigation">
         {NAV_ITEMS.map((it) => {
           if (it.authOnly && !username) return null;
-          const active = pathname === it.href;
           const href = navHref(it, username);
+          const active = pathname === it.href;
+          const isCurrent = pathname === href;
           return (
             <Link
               key={it.href}
@@ -79,6 +91,13 @@ export default function SideNav() {
               aria-label={it.label}
               aria-current={active ? "page" : undefined}
               onPointerDown={(e) => bounceNavItem(e.currentTarget)}
+              onClick={
+                it.href === "/"
+                  ? scheduleHomePageTitle
+                  : isCurrent
+                    ? scheduleApplyCurrentTitle
+                    : undefined
+              }
             >
               <span className="sidenav__icon-wrap">
                 <i className={`fa ${it.icon}`} aria-hidden="true" />
@@ -97,6 +116,7 @@ export default function SideNav() {
           active={profileActive}
           className="sidenav__item"
           onPointerDown={(e) => bounceNavItem(e.currentTarget)}
+          onClick={profileActive ? scheduleApplyCurrentTitle : undefined}
         />
       </nav>
 

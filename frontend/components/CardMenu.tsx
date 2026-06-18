@@ -73,6 +73,7 @@ export default function CardMenu({
       {open && (
         <div className="card-menu__panel" role="menu">
           <button type="button" className="card-menu__item" role="menuitem" onClick={onCopy}>
+            <i className="fa fa-link" aria-hidden="true" />
             {copyLabel}
           </button>
           {authed && !isOwn && (
@@ -82,6 +83,7 @@ export default function CardMenu({
               role="menuitem"
               onClick={() => setOpen(false)}
             >
+              <i className="fa fa-flag-o" aria-hidden="true" />
               Report
             </button>
           )}

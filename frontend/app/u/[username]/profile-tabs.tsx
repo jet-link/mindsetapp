@@ -4,8 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import {
-  ProfileReply,
-  Theme,
   AUTH_EVENT,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
@@ -20,7 +18,10 @@ import {
 } from "@/lib/api";
 import {
   ProfileTab,
-  clearProfileTabsCache,
+  ProfileSlice,
+  PROFILE_TABS,
+  getProfileTabsCache,
+  setProfileTabsCache,
 } from "@/lib/profile-tabs-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 import {
@@ -31,14 +32,9 @@ import {
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
-const ALL_TABS: ProfileTab[] = ["themes", "replies", "media", "reposts"];
+const ALL_TABS: ProfileTab[] = PROFILE_TABS;
 
-type TabSlice = {
-  themes: Theme[];
-  replies: ProfileReply[];
-  nextCursor: string | null;
-  loaded: boolean;
-};
+type TabSlice = ProfileSlice;
 
 function emptyTabSlice(): TabSlice {
   return { themes: [], replies: [], nextCursor: null, loaded: false };
@@ -75,13 +71,33 @@ const EMPTY_TEXT: Record<ProfileTab, string> = {
   reposts: "No reposts yet.",
 };
 
-function initialProfileTab(username: string): ProfileTab {
+function resolveInitialTab(username: string): ProfileTab {
   const anchor = findReturnAnchorByPrefix(`/u/${username}?`);
   if (anchor) {
     const tab = parseListKeySearchParams(anchor.listKey).get("tab");
     if (tab && ALL_TABS.includes(tab as ProfileTab)) return tab as ProfileTab;
   }
   return "themes";
+}
+
+type InitialState = {
+  tab: ProfileTab;
+  slices: Record<ProfileTab, TabSlice>;
+  loadingTab: ProfileTab | null;
+};
+
+function resolveInitialState(username: string): InitialState {
+  const cached = getProfileTabsCache(username);
+  if (cached) {
+    const tab = cached.tab;
+    return {
+      tab,
+      slices: cached.slices,
+      loadingTab: cached.slices[tab].loaded ? null : tab,
+    };
+  }
+  const tab = resolveInitialTab(username);
+  return { tab, slices: emptySlices(), loadingTab: tab };
 }
 
 export default function ProfileTabs({
@@ -91,12 +107,13 @@ export default function ProfileTabs({
   username: string;
   counts: ProfileCounts;
 }) {
-  const initialTab = initialProfileTab(username);
-  const [tab, setTab] = useState<ProfileTab>(initialTab);
-  const [slices, setSlices] = useState<Record<ProfileTab, TabSlice>>(emptySlices);
-  const [loadingTab, setLoadingTab] = useState<ProfileTab | null>(initialTab);
+  const initial = resolveInitialState(username);
+  const [tab, setTab] = useState<ProfileTab>(initial.tab);
+  const [slices, setSlices] = useState<Record<ProfileTab, TabSlice>>(initial.slices);
+  const [loadingTab, setLoadingTab] = useState<ProfileTab | null>(initial.loadingTab);
   const [error, setError] = useState("");
   const slicesRef = useRef(slices);
+  const syncedUsername = useRef(username);
   const panelsRef = useRef<HTMLDivElement>(null);
   const lockedScrollY = useRef<number | null>(null);
   const scrollLocked = useRef(false);
@@ -207,8 +224,17 @@ export default function ProfileTabs({
   );
 
   useEffect(() => {
-    clearProfileTabsCache();
+    if (syncedUsername.current === username) return;
+    syncedUsername.current = username;
     unlockScroll();
+    const cached = getProfileTabsCache(username);
+    if (cached) {
+      setTab(cached.tab);
+      setSlices(cached.slices);
+      setLoadingTab(cached.slices[cached.tab].loaded ? null : cached.tab);
+      setError("");
+      return;
+    }
     setTab("themes");
     setSlices(emptySlices());
     setLoadingTab("themes");
@@ -216,7 +242,11 @@ export default function ProfileTabs({
     window.scrollTo(0, 0);
   }, [username, unlockScroll]);
 
-  useEffect(() => () => clearProfileTabsCache(), []);
+  // Сохраняем срез вкладок, чтобы возврат по back-btn не перезагружал страницу.
+  useEffect(() => {
+    if (syncedUsername.current !== username) return;
+    setProfileTabsCache({ username, tab, slices });
+  }, [username, tab, slices]);
 
   useEffect(() => {
     load(tab);

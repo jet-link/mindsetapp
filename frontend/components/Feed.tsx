@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
-import Composer from "@/components/Composer";
 import LoginCta from "@/components/LoginCta";
 import {
   AUTH_EVENT,
@@ -419,8 +418,6 @@ export default function Feed() {
   return (
     <main>
       <PageHeader title="Main wall" showBack={false} />
-
-      {authed === true && <Composer />}
 
       {authed === true && (
         <div className="tabs feed-tabs" role="tablist" aria-label="Feed">

@@ -8,7 +8,7 @@
   --text-dim: #8a8a8a;
   --accent: #0a0a0a;
   --accent-text: #ffffff;
-  --brand: #c44569;
+  --brand: #ed4c67;
   --link: #0066cc;
   --like: #ff3040;
   --repost: #00a87e;
@@ -165,6 +165,11 @@ a { color: inherit; text-decoration: none; }
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -1px;
+  transition: transform 0.2s ease;
+}
+
+.sidenav__logo:hover{
+  transform: scale(1.08);
 }
 
 .sidenav__menu {
@@ -1499,5 +1504,5 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   }
   /* .card { padding-left: 12px; padding-right: 12px; } */
   .composer { padding-left: var(--shell-pad-x); padding-right: var(--shell-pad-x); }
-  .search-bar { margin-left: var(--shell-pad-x); margin-right: var(--shell-pad-x); }
+  /* .search-bar { margin-left: var(--shell-pad-x); margin-right: var(--shell-pad-x); } */
 }

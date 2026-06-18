@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
 import Composer from "@/components/Composer";
@@ -100,6 +100,7 @@ function initialWallTab(): WallTab {
 
 export default function Feed() {
   const router = useRouter();
+  const pathname = usePathname();
   const initialTab = initialWallTab();
 
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -205,6 +206,26 @@ export default function Feed() {
   useEffect(() => {
     setAuthed(isLoggedIn());
   }, []);
+
+  // После back-btn React может восстановить старое состояние — подтягиваем из кэша.
+  useEffect(() => {
+    if (pathname !== "/") return;
+    setSlices((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const tabId of ALL_TABS) {
+        const cache = getFeedCache(tabId);
+        if (!cache?.themes.length) continue;
+        next[tabId] = {
+          themes: cache.themes,
+          nextCursor: cache.nextCursor,
+          loaded: true,
+        };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [pathname]);
 
   useEffect(() => {
     load(tab);

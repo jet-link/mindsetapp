@@ -85,3 +85,49 @@ export function updateThemeRepostInProfileCache(
     };
   });
 }
+
+export function updateThemeRepliesInProfileCache(
+  themeId: number,
+  themeRepliesCount: number,
+  parentId?: number | null,
+  parentRepliesCount?: number,
+) {
+  mapCachedSlices((slice) => ({
+    ...slice,
+    themes: slice.themes.map((t) =>
+      t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
+    ),
+    replies: slice.replies.map((r) => {
+      let next = r;
+      if (r.theme.id === themeId) {
+        next = { ...next, theme: { ...next.theme, replies_count: themeRepliesCount } };
+      }
+      if (parentId != null && r.id === parentId && parentRepliesCount !== undefined) {
+        next = { ...next, replies_count: parentRepliesCount };
+      }
+      return next;
+    }),
+  }));
+}
+
+export function updateReplyLikeInProfileCache(replyId: number, liked: boolean, likesCount: number) {
+  mapCachedSlices((slice) => ({
+    ...slice,
+    replies: slice.replies.map((r) =>
+      r.id === replyId ? { ...r, is_liked: liked, likes_count: likesCount } : r,
+    ),
+  }));
+}
+
+export function updateReplyRepostInProfileCache(
+  replyId: number,
+  reposted: boolean,
+  repostsCount: number,
+) {
+  mapCachedSlices((slice) => ({
+    ...slice,
+    replies: slice.replies.map((r) =>
+      r.id === replyId ? { ...r, is_reposted: reposted, reposts_count: repostsCount } : r,
+    ),
+  }));
+}

@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import ThemeCard from "@/components/ThemeCard";
 import {
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
+  REPLY_CREATED_EVENT,
+  ReplyCreatedDetail,
   ThemeLikeDetail,
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
@@ -19,6 +22,7 @@ import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 export default function TagFeed({ slug }: { slug: string }) {
+  const pathname = usePathname();
   const initialCache = getTagCache(slug);
   const [themes, setThemes] = useState<Theme[]>(initialCache?.themes ?? []);
   const [nextCursor, setNextCursor] = useState<string | null>(initialCache?.nextCursor ?? null);
@@ -51,6 +55,15 @@ export default function TagFeed({ slug }: { slug: string }) {
   }, [listKey]);
 
   useRestoreAnchor(listKey, !loading && themes.length > 0);
+
+  useEffect(() => {
+    if (pathname !== `/tags/${slug}`) return;
+    const cache = getTagCache(slug);
+    if (!cache?.themes.length) return;
+    setThemes(cache.themes);
+    setNextCursor(cache.nextCursor);
+    setLoading(false);
+  }, [pathname, slug]);
 
   // При смене тега или возврате с детальной — кэш без повторной загрузки.
   useEffect(() => {
@@ -94,13 +107,23 @@ export default function TagFeed({ slug }: { slug: string }) {
       if (avatar === undefined) return;
       setThemes((prev) => patchThemeAuthors(prev, username, avatar));
     };
+    const onReplyCreated = (e: Event) => {
+      const { themeId, themeRepliesCount } = (e as CustomEvent<ReplyCreatedDetail>).detail;
+      setThemes((prev) =>
+        prev.map((t) =>
+          t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
+        ),
+      );
+    };
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+    window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
     return () => {
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
     };
   }, []);
 

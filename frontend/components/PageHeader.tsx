@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { setMobileBackVisible } from "@/lib/mobile-back";
 import BackButton from "./BackButton";
 
 export default function PageHeader({
@@ -14,9 +15,14 @@ export default function PageHeader({
     if (title) document.title = `${title} | Mindset`;
   }, [title]);
 
+  useEffect(() => {
+    setMobileBackVisible(showBack);
+    return () => setMobileBackVisible(false);
+  }, [showBack]);
+
   return (
     <div className="page-toolbar">
-      {showBack && <BackButton />}
+      {showBack && <BackButton className="page-toolbar__back" />}
       {title && <span className="page-title">{title}</span>}
     </div>
   );

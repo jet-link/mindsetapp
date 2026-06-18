@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "./reply-form";
-import { Reply, Theme, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
+import { Reply, Theme, REPLY_CREATED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyLikeDetail, ReplyRepostDetail, THEME_LIKE_EVENT, THEME_REPOST_EVENT, ThemeLikeDetail, ThemeRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
 import { getThreadCache, setThreadCache } from "@/lib/detail-cache";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
@@ -22,6 +23,7 @@ export default function ThreadView({
   focusReplyId?: number | null;
 }) {
   const initialCache = getThreadCache(id);
+  const pathname = usePathname();
   const [theme, setTheme] = useState<Theme | null>(initialCache?.theme ?? null);
   const [replies, setReplies] = useState<Reply[]>(initialCache?.replies ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
@@ -74,6 +76,14 @@ export default function ThreadView({
   }, [id, focusReplyId, load]);
 
   useEffect(() => {
+    if (focusReplyId || pathname !== `/thread/${id}`) return;
+    const snap = getThreadCache(id);
+    if (!snap) return;
+    setTheme(snap.theme);
+    setReplies(snap.replies);
+  }, [pathname, id, focusReplyId]);
+
+  useEffect(() => {
     const onProfileUpdated = (e: Event) => {
       const { username, avatar } = (e as CustomEvent<UserProfileUpdatedDetail>).detail;
       if (avatar === undefined) return;
@@ -87,6 +97,66 @@ export default function ThreadView({
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     return () => window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
   }, []);
+
+  useEffect(() => {
+    const onReplyCreated = (e: Event) => {
+      const { themeId, parentId, reply, themeRepliesCount, parentRepliesCount } = (
+        e as CustomEvent<ReplyCreatedDetail>
+      ).detail;
+      if (themeId !== id) return;
+      setTheme((prev) => (prev ? { ...prev, replies_count: themeRepliesCount } : prev));
+      setReplies((prev) => {
+        if (parentId === null) {
+          if (prev.some((r) => r.id === reply.id)) return prev;
+          return [reply, ...prev];
+        }
+        if (parentRepliesCount !== undefined) {
+          return prev.map((r) =>
+            r.id === parentId ? { ...r, replies_count: parentRepliesCount } : r,
+          );
+        }
+        return prev;
+      });
+    };
+    const onThemeLike = (e: Event) => {
+      const { themeId, liked, likes_count } = (e as CustomEvent<ThemeLikeDetail>).detail;
+      if (themeId !== id) return;
+      setTheme((prev) => (prev ? { ...prev, is_liked: liked, likes_count } : prev));
+    };
+    const onThemeRepost = (e: Event) => {
+      const { themeId, reposted, reposts_count } = (e as CustomEvent<ThemeRepostDetail>).detail;
+      if (themeId !== id) return;
+      setTheme((prev) =>
+        prev ? { ...prev, is_reposted: reposted, reposts_count } : prev,
+      );
+    };
+    const onReplyLike = (e: Event) => {
+      const { replyId, liked, likes_count } = (e as CustomEvent<ReplyLikeDetail>).detail;
+      setReplies((prev) =>
+        prev.map((r) => (r.id === replyId ? { ...r, is_liked: liked, likes_count } : r)),
+      );
+    };
+    const onReplyRepost = (e: Event) => {
+      const { replyId, reposted, reposts_count } = (e as CustomEvent<ReplyRepostDetail>).detail;
+      setReplies((prev) =>
+        prev.map((r) =>
+          r.id === replyId ? { ...r, is_reposted: reposted, reposts_count } : r,
+        ),
+      );
+    };
+    window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
+    window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
+    window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    return () => {
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
+      window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
+      window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
+      window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    };
+  }, [id]);
 
   if (loading && !theme) {
     return (

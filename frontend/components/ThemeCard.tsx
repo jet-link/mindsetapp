@@ -8,7 +8,11 @@ import Avatar from "@/components/Avatar";
 import {
   REPLY_CREATED_EVENT,
   ReplyCreatedDetail,
+  THEME_LIKE_EVENT,
+  THEME_REPOST_EVENT,
   Theme,
+  ThemeLikeDetail,
+  ThemeRepostDetail,
   emitThemeLikeChanged,
   emitThemeRepostChanged,
   formatCount,
@@ -57,8 +61,28 @@ export default function ThemeCard({
       const { themeId, themeRepliesCount } = (e as CustomEvent<ReplyCreatedDetail>).detail;
       if (themeId === theme.id) setReplies(themeRepliesCount);
     };
+    const onThemeLike = (e: Event) => {
+      const { themeId, liked, likes_count } = (e as CustomEvent<ThemeLikeDetail>).detail;
+      if (themeId === theme.id) {
+        setLiked(liked);
+        setLikes(likes_count);
+      }
+    };
+    const onThemeRepost = (e: Event) => {
+      const { themeId, reposted, reposts_count } = (e as CustomEvent<ThemeRepostDetail>).detail;
+      if (themeId === theme.id) {
+        setReposted(reposted);
+        setReposts(reposts_count);
+      }
+    };
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
-    return () => window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
+    window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    return () => {
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
+      window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    };
   }, [theme.id]);
 
   async function onLike() {

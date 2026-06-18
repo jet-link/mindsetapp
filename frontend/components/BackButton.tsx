@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 
-export default function BackButton() {
+export default function BackButton({ className }: { className?: string }) {
   const router = useRouter();
 
   return (
     <button
       type="button"
-      className="back-btn"
+      className={className ? `back-btn ${className}` : "back-btn"}
       aria-label="Go back"
       title="Back"
       onClick={() => {

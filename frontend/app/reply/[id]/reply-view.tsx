@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "@/app/thread/[id]/reply-form";
-import { Reply, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
+import { Reply, REPLY_CREATED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyLikeDetail, ReplyRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
 import { getReplyDetailCache, setReplyDetailCache } from "@/lib/detail-cache";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
@@ -20,6 +21,7 @@ export default function ReplyThreadView({
   focusReplyId?: number | null;
 }) {
   const initialCache = getReplyDetailCache(id);
+  const pathname = usePathname();
   const [reply, setReply] = useState<Reply | null>(initialCache?.reply ?? null);
   const [children, setChildren] = useState<Reply[]>(initialCache?.children ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
@@ -67,6 +69,14 @@ export default function ReplyThreadView({
   }, [id, focusReplyId, load]);
 
   useEffect(() => {
+    if (focusReplyId || pathname !== `/reply/${id}`) return;
+    const snap = getReplyDetailCache(id);
+    if (!snap) return;
+    setReply(snap.reply);
+    setChildren(snap.children);
+  }, [pathname, id, focusReplyId]);
+
+  useEffect(() => {
     const onProfileUpdated = (e: Event) => {
       const { username, avatar } = (e as CustomEvent<UserProfileUpdatedDetail>).detail;
       if (avatar === undefined) return;
@@ -80,6 +90,50 @@ export default function ReplyThreadView({
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     return () => window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
   }, []);
+
+  useEffect(() => {
+    const onReplyCreated = (e: Event) => {
+      const { parentId, reply, parentRepliesCount } = (e as CustomEvent<ReplyCreatedDetail>).detail;
+      if (parentId !== id) return;
+      if (parentRepliesCount !== undefined) {
+        setReply((prev) => (prev ? { ...prev, replies_count: parentRepliesCount } : prev));
+      }
+      setChildren((prev) => {
+        if (prev.some((r) => r.id === reply.id)) return prev;
+        return [reply, ...prev];
+      });
+    };
+    const onReplyLike = (e: Event) => {
+      const { replyId, liked, likes_count } = (e as CustomEvent<ReplyLikeDetail>).detail;
+      setReply((prev) =>
+        prev && prev.id === replyId ? { ...prev, is_liked: liked, likes_count } : prev,
+      );
+      setChildren((prev) =>
+        prev.map((r) => (r.id === replyId ? { ...r, is_liked: liked, likes_count } : r)),
+      );
+    };
+    const onReplyRepost = (e: Event) => {
+      const { replyId, reposted, reposts_count } = (e as CustomEvent<ReplyRepostDetail>).detail;
+      setReply((prev) =>
+        prev && prev.id === replyId
+          ? { ...prev, is_reposted: reposted, reposts_count }
+          : prev,
+      );
+      setChildren((prev) =>
+        prev.map((r) =>
+          r.id === replyId ? { ...r, is_reposted: reposted, reposts_count } : r,
+        ),
+      );
+    };
+    window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
+    window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    return () => {
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
+      window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    };
+  }, [id]);
 
   if (loading && !reply) {
     return (

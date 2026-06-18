@@ -7,8 +7,14 @@ import CardMenu from "@/components/CardMenu";
 import Avatar from "@/components/Avatar";
 import {
   REPLY_CREATED_EVENT,
+  REPLY_LIKE_EVENT,
+  REPLY_REPOST_EVENT,
   Reply,
   ReplyCreatedDetail,
+  ReplyLikeDetail,
+  ReplyRepostDetail,
+  emitReplyLikeChanged,
+  emitReplyRepostChanged,
   formatCount,
   isLoggedIn,
   toggleReplyLike,
@@ -60,8 +66,28 @@ export default function ReplyCard({
         setReplies(parentRepliesCount);
       }
     };
+    const onReplyLike = (e: Event) => {
+      const { replyId, liked, likes_count } = (e as CustomEvent<ReplyLikeDetail>).detail;
+      if (replyId === reply.id) {
+        setLiked(liked);
+        setLikes(likes_count);
+      }
+    };
+    const onReplyRepost = (e: Event) => {
+      const { replyId, reposted, reposts_count } = (e as CustomEvent<ReplyRepostDetail>).detail;
+      if (replyId === reply.id) {
+        setReposted(reposted);
+        setReposts(reposts_count);
+      }
+    };
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
-    return () => window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
+    window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    return () => {
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
+      window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    };
   }, [reply.id]);
 
   async function onLike() {
@@ -73,6 +99,11 @@ export default function ReplyCard({
       const r = await toggleReplyLike(reply.id);
       setLiked(r.liked);
       setLikes(r.likes_count);
+      emitReplyLikeChanged({
+        replyId: reply.id,
+        liked: r.liked,
+        likes_count: r.likes_count,
+      });
     } catch {
       window.location.href = "/login";
     }
@@ -87,6 +118,11 @@ export default function ReplyCard({
       const r = await toggleReplyRepost(reply.id);
       setReposted(r.reposted);
       setReposts(r.reposts_count);
+      emitReplyRepostChanged({
+        replyId: reply.id,
+        reposted: r.reposted,
+        reposts_count: r.reposts_count,
+      });
     } catch {
       window.location.href = "/login";
     }

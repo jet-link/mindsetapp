@@ -2,6 +2,13 @@
 // (drf-spectacular: /api/schema/), пока описаны вручную.
 
 import {
+  applyReplyCreated,
+  applyReplyLikeChanged,
+  applyReplyRepostChanged,
+  applyThemeLikeChanged,
+  applyThemeRepostChanged,
+} from "./detail-cache";
+import {
   prependThemeToFeedCache,
   updateAuthorAvatarInFeedCache,
   updateThemeRepliesInFeedCache,
@@ -10,7 +17,19 @@ import {
   removeAuthorFromFollowingFeedCache,
   clearFeedCache,
 } from "./feed-cache";
-import { clearProfileTabsCache, updateThemeLikeInProfileCache, updateThemeRepostInProfileCache } from "./profile-tabs-cache";
+import {
+  clearProfileTabsCache,
+  updateThemeLikeInProfileCache,
+  updateThemeRepostInProfileCache,
+  updateThemeRepliesInProfileCache,
+  updateReplyLikeInProfileCache,
+  updateReplyRepostInProfileCache,
+} from "./profile-tabs-cache";
+import {
+  updateThemeRepliesInTagCaches,
+  updateThemeLikeInTagCaches,
+  updateThemeRepostInTagCaches,
+} from "./tag-cache";
 import { setUserAvatarOverride } from "./user-avatar-store";
 
 export interface UserPublic {
@@ -676,6 +695,14 @@ export interface ReplyCreatedDetail {
 
 export function emitReplyCreated(detail: ReplyCreatedDetail) {
   updateThemeRepliesInFeedCache(detail.themeId, detail.themeRepliesCount);
+  updateThemeRepliesInTagCaches(detail.themeId, detail.themeRepliesCount);
+  updateThemeRepliesInProfileCache(
+    detail.themeId,
+    detail.themeRepliesCount,
+    detail.parentId,
+    detail.parentRepliesCount,
+  );
+  applyReplyCreated(detail);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_CREATED_EVENT, { detail }));
   }
@@ -691,7 +718,9 @@ export interface ThemeLikeDetail {
 
 export function emitThemeLikeChanged(detail: ThemeLikeDetail) {
   updateThemeLikeInFeedCache(detail.themeId, detail.liked, detail.likes_count);
+  updateThemeLikeInTagCaches(detail.themeId, detail.liked, detail.likes_count);
   updateThemeLikeInProfileCache(detail.themeId, detail.liked, detail.likes_count);
+  applyThemeLikeChanged(detail.themeId, detail.liked, detail.likes_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(THEME_LIKE_EVENT, { detail }));
   }
@@ -707,8 +736,42 @@ export interface ThemeRepostDetail {
 
 export function emitThemeRepostChanged(detail: ThemeRepostDetail) {
   updateThemeRepostInFeedCache(detail.themeId, detail.reposted, detail.reposts_count);
+  updateThemeRepostInTagCaches(detail.themeId, detail.reposted, detail.reposts_count);
   updateThemeRepostInProfileCache(detail.themeId, detail.reposted, detail.reposts_count);
+  applyThemeRepostChanged(detail.themeId, detail.reposted, detail.reposts_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(THEME_REPOST_EVENT, { detail }));
+  }
+}
+
+export const REPLY_LIKE_EVENT = "mindset-reply-like";
+
+export interface ReplyLikeDetail {
+  replyId: number;
+  liked: boolean;
+  likes_count: number;
+}
+
+export function emitReplyLikeChanged(detail: ReplyLikeDetail) {
+  updateReplyLikeInProfileCache(detail.replyId, detail.liked, detail.likes_count);
+  applyReplyLikeChanged(detail.replyId, detail.liked, detail.likes_count);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(REPLY_LIKE_EVENT, { detail }));
+  }
+}
+
+export const REPLY_REPOST_EVENT = "mindset-reply-repost";
+
+export interface ReplyRepostDetail {
+  replyId: number;
+  reposted: boolean;
+  reposts_count: number;
+}
+
+export function emitReplyRepostChanged(detail: ReplyRepostDetail) {
+  updateReplyRepostInProfileCache(detail.replyId, detail.reposted, detail.reposts_count);
+  applyReplyRepostChanged(detail.replyId, detail.reposted, detail.reposts_count);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(REPLY_REPOST_EVENT, { detail }));
   }
 }

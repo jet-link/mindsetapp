@@ -1,10 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import {
   AUTH_EVENT,
+  REPLY_CREATED_EVENT,
+  REPLY_LIKE_EVENT,
+  REPLY_REPOST_EVENT,
+  ReplyCreatedDetail,
+  ReplyLikeDetail,
+  ReplyRepostDetail,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
   ThemeLikeDetail,
@@ -107,6 +114,7 @@ export default function ProfileTabs({
   username: string;
   counts: ProfileCounts;
 }) {
+  const pathname = usePathname();
   const initial = resolveInitialState(username);
   const [tab, setTab] = useState<ProfileTab>(initial.tab);
   const [slices, setSlices] = useState<Record<ProfileTab, TabSlice>>(initial.slices);
@@ -242,6 +250,16 @@ export default function ProfileTabs({
     window.scrollTo(0, 0);
   }, [username, unlockScroll]);
 
+  // После back-btn подтягиваем актуальные like/repost из кэша.
+  useEffect(() => {
+    if (!pathname.startsWith(`/u/${username}`)) return;
+    const cached = getProfileTabsCache(username);
+    if (!cached) return;
+    setTab(cached.tab);
+    setSlices(cached.slices);
+    setLoadingTab(cached.slices[cached.tab].loaded ? null : cached.tab);
+  }, [pathname, username]);
+
   // Сохраняем срез вкладок, чтобы возврат по back-btn не перезагружал страницу.
   useEffect(() => {
     if (syncedUsername.current !== username) return;
@@ -372,13 +390,64 @@ export default function ProfileTabs({
         }),
       );
     };
+    const onReplyCreated = (e: Event) => {
+      const { themeId, parentId, themeRepliesCount, parentRepliesCount } = (
+        e as CustomEvent<ReplyCreatedDetail>
+      ).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice) => ({
+          ...slice,
+          themes: slice.themes.map((t) =>
+            t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
+          ),
+          replies: slice.replies.map((r) => {
+            let next = r;
+            if (r.theme.id === themeId) {
+              next = { ...next, theme: { ...next.theme, replies_count: themeRepliesCount } };
+            }
+            if (parentId != null && r.id === parentId && parentRepliesCount !== undefined) {
+              next = { ...next, replies_count: parentRepliesCount };
+            }
+            return next;
+          }),
+        })),
+      );
+    };
+    const onReplyLike = (e: Event) => {
+      const { replyId, liked, likes_count } = (e as CustomEvent<ReplyLikeDetail>).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice) => ({
+          ...slice,
+          replies: slice.replies.map((r) =>
+            r.id === replyId ? { ...r, is_liked: liked, likes_count } : r,
+          ),
+        })),
+      );
+    };
+    const onReplyRepost = (e: Event) => {
+      const { replyId, reposted, reposts_count } = (e as CustomEvent<ReplyRepostDetail>).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice) => ({
+          ...slice,
+          replies: slice.replies.map((r) =>
+            r.id === replyId ? { ...r, is_reposted: reposted, reposts_count } : r,
+          ),
+        })),
+      );
+    };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
+    window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
     return () => {
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
+      window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
+      window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
     };
   }, []);
 

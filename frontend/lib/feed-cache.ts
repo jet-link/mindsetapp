@@ -99,3 +99,11 @@ export function removeThemeFromFeedCache(themeId: number) {
     c.themes = c.themes.filter((t) => t.id !== themeId);
   });
 }
+
+export function findThemeInFeedCaches(themeId: number): Theme | null {
+  for (const snapshot of Object.values(feedCaches)) {
+    const hit = snapshot.themes.find((t) => t.id === themeId);
+    if (hit) return hit;
+  }
+  return null;
+}

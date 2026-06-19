@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchor } from "@/lib/return-anchor";
+import { seedThreadTheme } from "@/lib/detail-cache";
 
 
 export default function ThemeCard({
@@ -160,6 +161,7 @@ export default function ThemeCard({
   }
 
   function onReply() {
+    seedThreadTheme(theme);
     router.push(`/thread/${theme.id}`);
   }
 
@@ -168,6 +170,7 @@ export default function ThemeCard({
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
     saveReturnAnchor({ kind: "theme", id: theme.id });
+    seedThreadTheme(theme);
     router.push(`/thread/${theme.id}`);
   }
 

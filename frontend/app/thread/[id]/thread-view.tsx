@@ -9,6 +9,7 @@ import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "./reply-form";
 import { Reply, Theme, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, THEME_LIKE_EVENT, THEME_REPOST_EVENT, ThemeLikeDetail, ThemeRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
 import { getThreadCache, setThreadCache } from "@/lib/detail-cache";
+import { reconcileReplyViewerFlags, reconcileThemeViewerFlags, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchReplyAuthors, patchThemeAuthors } from "@/lib/user-avatar-store";
@@ -23,9 +24,12 @@ export default function ThreadView({
   focusReplyId?: number | null;
 }) {
   const initialCache = getThreadCache(id);
+  const initialTheme = initialCache?.theme ?? findThemeInAllCaches(id);
   const pathname = usePathname();
   const router = useRouter();
-  const [theme, setTheme] = useState<Theme | null>(initialCache?.theme ?? null);
+  const [theme, setTheme] = useState<Theme | null>(
+    initialTheme ? reconcileThemeViewerFlags(initialTheme) : null,
+  );
   const [replies, setReplies] = useState<Reply[]>(initialCache?.replies ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
@@ -41,18 +45,20 @@ export default function ThreadView({
     setError("");
     try {
       const data = await getThread(id);
-      setTheme(data.theme);
+      const nextTheme = reconcileThemeViewerFlags(data.theme);
+      const nextReplies = data.replies.map(reconcileReplyViewerFlags);
+      setTheme(nextTheme);
       if (focusReplyId) {
-        const focused = data.replies.find((r) => r.id === focusReplyId);
+        const focused = nextReplies.find((r) => r.id === focusReplyId);
         if (focused) {
           setReplies([focused]);
         } else {
           const detail = await getReplyDetail(focusReplyId);
-          setReplies([detail.reply]);
+          setReplies([reconcileReplyViewerFlags(detail.reply)]);
         }
       } else {
-        setReplies(data.replies);
-        setThreadCache(id, { theme: data.theme, replies: data.replies });
+        setReplies(nextReplies);
+        setThreadCache(id, { theme: nextTheme, replies: nextReplies });
       }
     } catch {
       setError("Thread not found or the API is unavailable.");
@@ -68,10 +74,14 @@ export default function ThreadView({
     }
     const snap = getThreadCache(id);
     if (snap) {
-      setTheme(snap.theme);
-      setReplies(snap.replies);
+      setTheme(reconcileThemeViewerFlags(snap.theme));
+      setReplies(snap.replies.map(reconcileReplyViewerFlags));
       setLoading(false);
-      return;
+    } else {
+      const fromLists = findThemeInAllCaches(id);
+      if (fromLists) {
+        setTheme(reconcileThemeViewerFlags(fromLists));
+      }
     }
     load();
   }, [id, focusReplyId, load]);
@@ -80,8 +90,8 @@ export default function ThreadView({
     if (focusReplyId || pathname !== `/thread/${id}`) return;
     const snap = getThreadCache(id);
     if (!snap) return;
-    setTheme(snap.theme);
-    setReplies(snap.replies);
+    setTheme(reconcileThemeViewerFlags(snap.theme));
+    setReplies(snap.replies.map(reconcileReplyViewerFlags));
   }, [pathname, id, focusReplyId]);
 
   useEffect(() => {

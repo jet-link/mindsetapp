@@ -149,3 +149,23 @@ export function removeReplyFromProfileCache(replyId: number, _themeId: number) {
     replies: slice.replies.filter((r) => r.id !== replyId),
   }));
 }
+
+export function findThemeInProfileCache(themeId: number): Theme | null {
+  if (!profileTabsCache) return null;
+  for (const tab of PROFILE_TABS) {
+    const hit = profileTabsCache.slices[tab].themes.find((t) => t.id === themeId);
+    if (hit) return hit;
+    const nested = profileTabsCache.slices[tab].replies.find((r) => r.theme.id === themeId);
+    if (nested) return nested.theme;
+  }
+  return null;
+}
+
+export function findReplyInProfileCache(replyId: number): ProfileReply | null {
+  if (!profileTabsCache) return null;
+  for (const tab of PROFILE_TABS) {
+    const hit = profileTabsCache.slices[tab].replies.find((r) => r.id === replyId);
+    if (hit) return hit;
+  }
+  return null;
+}

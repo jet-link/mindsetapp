@@ -57,3 +57,11 @@ export function removeThemeFromTagCaches(themeId: number) {
     cache.themes = cache.themes.filter((t) => t.id !== themeId);
   }
 }
+
+export function findThemeInTagCaches(themeId: number): Theme | null {
+  for (const slug of Object.keys(tagCaches)) {
+    const hit = tagCaches[slug].themes.find((t) => t.id === themeId);
+    if (hit) return hit;
+  }
+  return null;
+}

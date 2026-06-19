@@ -29,6 +29,40 @@ export function setThreadCache(id: number, snapshot: ThreadSnapshot) {
   threadCaches.set(id, snapshot);
 }
 
+export function seedThreadTheme(theme: Theme) {
+  const existing = threadCaches.get(theme.id);
+  threadCaches.set(theme.id, {
+    theme,
+    replies: existing?.replies ?? [],
+  });
+}
+
+export function findReplyInThreadCaches(replyId: number): Reply | null {
+  for (const snap of threadCaches.values()) {
+    const hit = snap.replies.find((r) => r.id === replyId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function seedReplyDetailReply(reply: Reply) {
+  const existing = replyCaches.get(reply.id);
+  replyCaches.set(reply.id, {
+    reply,
+    children: existing?.children ?? [],
+  });
+}
+
+export function findReplyInDetailCaches(replyId: number): Reply | null {
+  const snap = replyCaches.get(replyId);
+  if (snap) return snap.reply;
+  for (const s of replyCaches.values()) {
+    const hit = s.children.find((r) => r.id === replyId);
+    if (hit) return hit;
+  }
+  return findReplyInThreadCaches(replyId);
+}
+
 export function getReplyDetailCache(id: number): ReplySnapshot | null {
   return replyCaches.get(id) ?? null;
 }

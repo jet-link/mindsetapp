@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchor } from "@/lib/return-anchor";
+import { seedReplyDetailReply } from "@/lib/detail-cache";
 
 export default function ReplyCard({
   reply,
@@ -137,6 +138,7 @@ export default function ReplyCard({
   }
 
   function onReplies() {
+    seedReplyDetailReply(reply);
     router.push(`/reply/${reply.id}`);
   }
 
@@ -145,6 +147,7 @@ export default function ReplyCard({
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
     saveReturnAnchor({ kind: "reply", id: reply.id });
+    seedReplyDetailReply(reply);
     router.push(`/reply/${reply.id}`);
   }
 

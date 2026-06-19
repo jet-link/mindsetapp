@@ -8,6 +8,10 @@ import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "@/app/thread/[id]/reply-form";
 import { Reply, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
 import { getReplyDetailCache, setReplyDetailCache } from "@/lib/detail-cache";
+import {
+  findReplyInAllCaches,
+  reconcileReplyViewerFlags,
+} from "@/lib/theme-cache-lookup";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchReplyAuthors } from "@/lib/user-avatar-store";
@@ -21,9 +25,12 @@ export default function ReplyThreadView({
   focusReplyId?: number | null;
 }) {
   const initialCache = getReplyDetailCache(id);
+  const initialReply = initialCache?.reply ?? findReplyInAllCaches(id);
   const pathname = usePathname();
   const router = useRouter();
-  const [reply, setReply] = useState<Reply | null>(initialCache?.reply ?? null);
+  const [reply, setReply] = useState<Reply | null>(
+    initialReply ? reconcileReplyViewerFlags(initialReply) : null,
+  );
   const [children, setChildren] = useState<Reply[]>(initialCache?.children ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
@@ -39,13 +46,15 @@ export default function ReplyThreadView({
     setError("");
     try {
       const data = await getReplyDetail(id);
-      setReply(data.reply);
+      const nextReply = reconcileReplyViewerFlags(data.reply);
+      const nextChildren = data.replies.map(reconcileReplyViewerFlags);
+      setReply(nextReply);
       if (focusReplyId) {
-        const focused = data.replies.find((r) => r.id === focusReplyId);
+        const focused = nextChildren.find((r) => r.id === focusReplyId);
         setChildren(focused ? [focused] : []);
       } else {
-        setChildren(data.replies);
-        setReplyDetailCache(id, { reply: data.reply, children: data.replies });
+        setChildren(nextChildren);
+        setReplyDetailCache(id, { reply: nextReply, children: nextChildren });
       }
     } catch {
       setError("Reply not found or the API is unavailable.");
@@ -61,10 +70,14 @@ export default function ReplyThreadView({
     }
     const snap = getReplyDetailCache(id);
     if (snap) {
-      setReply(snap.reply);
-      setChildren(snap.children);
+      setReply(reconcileReplyViewerFlags(snap.reply));
+      setChildren(snap.children.map(reconcileReplyViewerFlags));
       setLoading(false);
-      return;
+    } else {
+      const fromLists = findReplyInAllCaches(id);
+      if (fromLists) {
+        setReply(reconcileReplyViewerFlags(fromLists));
+      }
     }
     load();
   }, [id, focusReplyId, load]);
@@ -73,8 +86,8 @@ export default function ReplyThreadView({
     if (focusReplyId || pathname !== `/reply/${id}`) return;
     const snap = getReplyDetailCache(id);
     if (!snap) return;
-    setReply(snap.reply);
-    setChildren(snap.children);
+    setReply(reconcileReplyViewerFlags(snap.reply));
+    setChildren(snap.children.map(reconcileReplyViewerFlags));
   }, [pathname, id, focusReplyId]);
 
   useEffect(() => {

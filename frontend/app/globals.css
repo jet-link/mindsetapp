@@ -819,7 +819,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 700;
-  padding: 9px 17px;
+  padding: 11px 17px;
   border-radius: 999px;
   align-self: flex-end;
   font-size: .875rem;

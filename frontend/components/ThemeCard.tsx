@@ -33,7 +33,11 @@ export default function ThemeCard({
   theme: Theme;
   clickable?: boolean;
   threadLineBelow?: boolean;
-  onRepostChange?: (themeId: number, reposted: boolean) => void;
+  onRepostChange?: (
+    themeId: number,
+    reposted: boolean,
+    options?: { theme?: Theme; immediate?: boolean },
+  ) => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
@@ -114,12 +118,25 @@ export default function ThemeCard({
     }
     const optimistic = !reposted;
     setReposted(optimistic);
-    if (!optimistic) onRepostChange?.(theme.id, false);
+    if (optimistic) {
+      onRepostChange?.(theme.id, true, {
+        theme: { ...theme, is_reposted: true, reposts_count: reposts + 1 },
+      });
+    } else {
+      onRepostChange?.(theme.id, false);
+    }
     try {
       const r = await toggleRepost(theme.id);
       setReposted(r.reposted);
       setReposts(r.reposts_count);
-      if (r.reposted !== optimistic) onRepostChange?.(theme.id, r.reposted);
+      if (r.reposted !== optimistic) {
+        onRepostChange?.(theme.id, r.reposted, {
+          theme: r.reposted
+            ? { ...theme, is_reposted: true, reposts_count: r.reposts_count }
+            : undefined,
+          immediate: !r.reposted,
+        });
+      }
       emitThemeRepostChanged({
         themeId: theme.id,
         reposted: r.reposted,
@@ -127,7 +144,11 @@ export default function ThemeCard({
       });
     } catch {
       setReposted(!optimistic);
-      if (!optimistic) onRepostChange?.(theme.id, true);
+      if (optimistic) {
+        onRepostChange?.(theme.id, false, { immediate: true });
+      } else {
+        onRepostChange?.(theme.id, true);
+      }
       window.location.href = "/login";
     }
   }

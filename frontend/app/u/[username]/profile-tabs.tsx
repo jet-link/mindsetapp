@@ -15,6 +15,7 @@ import {
   ReplyRepostDetail,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
+  Theme,
   ThemeLikeDetail,
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
@@ -64,6 +65,60 @@ function mapSlices(
     next[tabId] = fn(slices[tabId], tabId);
   }
   return next;
+}
+
+function findThemeInSlices(
+  slices: Record<ProfileTab, TabSlice>,
+  themeId: number,
+): Theme | null {
+  for (const tabId of ALL_TABS) {
+    const slice = slices[tabId];
+    const theme = slice.themes.find((t) => t.id === themeId);
+    if (theme) return theme;
+    for (const reply of slice.replies) {
+      if (reply.theme.id === themeId) return reply.theme;
+    }
+  }
+  return null;
+}
+
+function patchThemeRepostFlags(
+  slices: Record<ProfileTab, TabSlice>,
+  themeId: number,
+  reposted: boolean,
+  repostsCount: number,
+): Record<ProfileTab, TabSlice> {
+  return mapSlices(slices, (slice, tabId) => {
+    if (tabId === "reposts" && !reposted) return slice;
+    return {
+      ...slice,
+      themes: slice.themes.map((t) =>
+        t.id === themeId ? { ...t, is_reposted: reposted, reposts_count: repostsCount } : t,
+      ),
+      replies: slice.replies.map((r) =>
+        r.theme.id === themeId
+          ? {
+              ...r,
+              theme: { ...r.theme, is_reposted: reposted, reposts_count: repostsCount },
+            }
+          : r,
+      ),
+    };
+  });
+}
+
+function prependToRepostsSlice(
+  slices: Record<ProfileTab, TabSlice>,
+  theme: Theme,
+): Record<ProfileTab, TabSlice> {
+  const repostsSlice = slices.reposts;
+  const themes = repostsSlice.themes.some((t) => t.id === theme.id)
+    ? repostsSlice.themes.map((t) => (t.id === theme.id ? { ...t, ...theme } : t))
+    : [theme, ...repostsSlice.themes];
+  return {
+    ...slices,
+    reposts: { ...repostsSlice, themes, loaded: true },
+  };
 }
 
 export interface ProfileCounts {
@@ -169,12 +224,47 @@ export default function ProfileTabs({
     [username],
   );
 
+  const addRepostToSlice = useCallback(
+    (theme: Theme) => {
+      if (username !== getStoredUsername()) return;
+      setSlices((prev) => {
+        const updated = { ...theme, is_reposted: true };
+        const flagged = patchThemeRepostFlags(
+          prev,
+          theme.id,
+          true,
+          theme.reposts_count,
+        );
+        return prependToRepostsSlice(flagged, updated);
+      });
+    },
+    [username],
+  );
+
   const handleRepostChange = useCallback(
-    (themeId: number, reposted: boolean) => {
-      if (reposted) cancelRepostRemove(themeId);
+    (
+      themeId: number,
+      reposted: boolean,
+      options?: { theme?: Theme; immediate?: boolean },
+    ) => {
+      if (username !== getStoredUsername()) return;
+      if (reposted) {
+        cancelRepostRemove(themeId);
+        const theme =
+          options?.theme ?? findThemeInSlices(slicesRef.current, themeId);
+        if (theme) addRepostToSlice({ ...theme, is_reposted: true });
+        return;
+      }
+      if (options?.immediate) removeRepostFromSlice(themeId);
       else scheduleRepostRemove(themeId);
     },
-    [cancelRepostRemove, scheduleRepostRemove],
+    [
+      addRepostToSlice,
+      cancelRepostRemove,
+      removeRepostFromSlice,
+      scheduleRepostRemove,
+      username,
+    ],
   );
 
   const applyScrollFloor = useCallback(() => {
@@ -422,24 +512,20 @@ export default function ProfileTabs({
       if (!reposted && isOwnProfile) {
         scheduleRepostRemove(themeId);
       }
-      setSlices((prev) =>
-        mapSlices(prev, (slice, tabId) => {
-          if (tabId === "reposts" && !reposted) {
-            return slice;
+      setSlices((prev) => {
+        let next = patchThemeRepostFlags(prev, themeId, reposted, reposts_count);
+        if (reposted && isOwnProfile) {
+          const source = findThemeInSlices(next, themeId);
+          if (source) {
+            next = prependToRepostsSlice(next, {
+              ...source,
+              is_reposted: true,
+              reposts_count,
+            });
           }
-          return {
-            ...slice,
-            themes: slice.themes.map((t) =>
-              t.id === themeId ? { ...t, is_reposted: reposted, reposts_count } : t,
-            ),
-            replies: slice.replies.map((r) =>
-              r.theme.id === themeId
-                ? { ...r, theme: { ...r.theme, is_reposted: reposted, reposts_count } }
-                : r,
-            ),
-          };
-        }),
-      );
+        }
+        return next;
+      });
     };
     const onReplyCreated = (e: Event) => {
       const { themeId, parentId, themeRepliesCount, parentRepliesCount } = (
@@ -530,6 +616,11 @@ export default function ProfileTabs({
     { id: "reposts", label: "Reposts", count: counts.reposts },
   ];
 
+  const isOwnProfile = getStoredUsername() === username;
+  const themeRepostProps = isOwnProfile
+    ? { onRepostChange: handleRepostChange }
+    : {};
+
   return (
     <>
       <div className="tabs profile-tabs" role="tablist" aria-label="Profile posts">
@@ -577,7 +668,7 @@ export default function ProfileTabs({
                   ? slice.replies.map((r) => (
                       <div key={`r-${r.id}`} className="profile-reply-thread">
                         <div className="thread-chain">
-                          <ThemeCard theme={r.theme} threadLineBelow />
+                          <ThemeCard theme={r.theme} threadLineBelow {...themeRepostProps} />
                           <ReplyCard reply={r} indented clickable />
                         </div>
                       </div>
@@ -589,11 +680,11 @@ export default function ProfileTabs({
                           exiting={exitingRepostIds.has(t.id)}
                           onExitComplete={() => removeRepostFromSlice(t.id)}
                         >
-                          <ThemeCard theme={t} onRepostChange={handleRepostChange} />
+                          <ThemeCard theme={t} {...themeRepostProps} />
                         </ListExitWrap>
                       ))
                     : slice.themes.map((t) => (
-                        <ThemeCard key={`${tabId}-${t.id}`} theme={t} />
+                        <ThemeCard key={`${tabId}-${t.id}`} theme={t} {...themeRepostProps} />
                       ))}
               </div>
 

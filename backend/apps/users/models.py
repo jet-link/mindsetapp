@@ -39,3 +39,31 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.username
+
+
+class SearchEvent(models.Model):
+    """Агрегируемые события поиска для popular queries."""
+
+    class Tab(models.TextChoices):
+        THEMES = 'themes', 'themes'
+        USERS = 'users', 'users'
+
+    tab = models.CharField(max_length=10, choices=Tab.choices, db_index=True)
+    query_normalized = models.CharField(max_length=128, db_index=True)
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='search_events',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [
+            models.Index(fields=['tab', 'query_normalized', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.tab}:{self.query_normalized}'

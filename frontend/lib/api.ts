@@ -608,6 +608,42 @@ export const clearNotifications = () =>
   apiFetch<{ deleted: number }>("/api/v1/notifications/clear/", { method: "POST" });
 
 // --- Search ---
+export type DiscoverMode = "popular" | "trending";
+
+export interface DiscoverPayload {
+  mode: DiscoverMode;
+  themes: string[];
+  users: string[];
+  cached_until?: string;
+}
+
+export interface PopularQueriesPayload {
+  themes: string[];
+  users: string[];
+  cached_until?: string;
+}
+
+export const getDiscover = (mode: DiscoverMode = "popular") =>
+  apiFetch<DiscoverPayload>(`/api/v1/search/discover/?mode=${mode}`);
+
+export const getPopularQueries = () =>
+  apiFetch<PopularQueriesPayload>("/api/v1/search/popular/");
+
+/** @deprecated use getDiscover / getPopularQueries */
+export const getPopularSearches = getPopularQueries;
+
+export const searchThemes = (q: string, cursor?: string, signal?: AbortSignal) =>
+  apiFetch<CursorPage<Theme>>(
+    `/api/v1/search/themes/${buildQuery({ q, cursor })}`,
+    { signal },
+  );
+
+export const recordSearchEvent = (tab: "themes" | "users", query: string) =>
+  apiFetch<{ ok: boolean }>("/api/v1/search/events/", {
+    method: "POST",
+    body: JSON.stringify({ tab, query }),
+  }).catch(() => undefined);
+
 export const searchUsers = (q: string, cursor?: string, signal?: AbortSignal) =>
   apiFetch<CursorPage<UserPublic>>(
     `/api/v1/users/search/${buildQuery({ q, cursor })}`,
@@ -619,9 +655,6 @@ export const searchMentionUsers = (q: string, signal?: AbortSignal) =>
     `/api/v1/users/search/${buildQuery({ q, username_only: "1" })}`,
     { signal },
   );
-
-export const getPopularSearches = () =>
-  apiFetch<{ themes: string[]; users: string[] }>("/api/v1/search/popular/");
 
 export const getTagThemes = (slug: string, cursor?: string) =>
   apiFetch<CursorPage<Theme>>(

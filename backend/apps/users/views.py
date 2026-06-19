@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 from apps.core.pagination import IdCursorPagination
 from apps.follows.models import Follow
 from apps.follows.services import FollowError, toggle_follow
-from apps.threads.models import Hashtag
 
 from .serializers import (
     MeSerializer,
@@ -105,51 +104,33 @@ class FollowingListView(generics.ListAPIView):
 
 
 class UserSearchView(generics.ListAPIView):
-    """GET /users/search/?q= — поиск пользователей.
-
-    ``username_only=1`` — только по username (для @mention в composer).
-    """
+    """Legacy alias — используй RankedUserSearchView в urls."""
 
     serializer_class = UserCardSerializer
     pagination_class = IdCursorPagination
 
     def get_queryset(self):
+        from .search_services import search_users_queryset
+
         q = self.request.query_params.get('q', '').strip()
-        if not q:
-            return User.objects.none()
         username_only = self.request.query_params.get('username_only', '').lower() in (
             '1', 'true', 'yes',
         )
-        qs = User.objects.filter(is_active=True)
-        if username_only:
-            qs = qs.filter(username__icontains=q)
-        else:
-            qs = qs.filter(Q(username__icontains=q) | Q(bio__icontains=q))
-        return qs.order_by('-followers_count', 'username')
+        return search_users_queryset(q, username_only=username_only)
 
     def get_serializer_context(self):
         return {**super().get_serializer_context(), **_following_ids_context(self)}
 
 
 class PopularSearchView(APIView):
-    """GET /search/popular/ — популярные запросы для страницы поиска."""
+    """Deprecated: GET /search/popular/ перенесён в PopularQueriesView."""
 
     permission_classes = (permissions.AllowAny,)
 
     def get(self, request):
-        theme_queries = list(
-            Hashtag.objects.order_by('-themes_count')
-            .values_list('name', flat=True)[:6]
-        )
-        user_queries = list(
-            User.objects.filter(is_active=True)
-            .order_by('-followers_count')
-            .values_list('username', flat=True)[:6]
-        )
-        return Response({
-            'themes': theme_queries,
-            'users': user_queries,
-        })
+        from .search_services import get_popular_queries
+
+        return Response(get_popular_queries())
 
 
 class MeView(generics.RetrieveUpdateAPIView):

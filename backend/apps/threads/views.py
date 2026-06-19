@@ -117,17 +117,9 @@ class FeedView(generics.ListAPIView):
 
         # Поиск: #tag → по хэштегу, обычный текст → по body_text.
         if q:
-            if q.startswith('#'):
-                tag = q.lstrip('#').strip()
-                if tag:
-                    slug = slugify(tag)
-                    return qs.filter(
-                        Q(hashtags__slug=slug)
-                        | Q(hashtags__name__iexact=tag)
-                        | Q(hashtags__slug__icontains=slug)
-                    ).distinct()
-                return Theme.objects.none()
-            return qs.filter(body_text__icontains=q)
+            from apps.users.search_services import search_themes_queryset
+
+            return search_themes_queryset(q)
 
         if tab == 'my':
             if not user.is_authenticated:

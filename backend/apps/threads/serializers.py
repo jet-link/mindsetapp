@@ -65,6 +65,7 @@ class ReplySerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
     author = UserPublicSerializer(read_only=True)
     image = ReplyImageSerializer(read_only=True)
     human_published = serializers.CharField(read_only=True)
+    is_deletable = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Reply
@@ -72,7 +73,7 @@ class ReplySerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
             'id', 'theme_id', 'parent_id', 'author', 'body', 'image',
             'replies_count', 'likes_count', 'reposts_count',
             'is_liked', 'is_reposted',
-            'created_at', 'human_published',
+            'created_at', 'human_published', 'is_deletable',
         )
         read_only_fields = fields
 
@@ -102,6 +103,7 @@ class ThemeSerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
     human_published = serializers.CharField(read_only=True)
     preview = serializers.CharField(read_only=True)
     is_shared = serializers.SerializerMethodField()
+    is_deletable = serializers.BooleanField(read_only=True)
 
     def get_is_shared(self, obj) -> bool:
         return self._viewer_flag(obj, 'shared_ids')
@@ -113,7 +115,7 @@ class ThemeSerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
             'images', 'hashtags',
             'replies_count', 'likes_count', 'reposts_count', 'shares_count',
             'is_liked', 'is_reposted', 'is_shared',
-            'created_at', 'updated_at', 'human_published', 'is_editable',
+            'created_at', 'updated_at', 'human_published', 'is_editable', 'is_deletable',
         )
         read_only_fields = fields
 

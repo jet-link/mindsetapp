@@ -251,7 +251,7 @@ export default function SearchPage() {
       </form>
 
       {showPopular && (popular.themes.length > 0 || popular.users.length > 0) && (
-        <section className="popular-search search-panel search-panel--visible">
+        <div className="popular-search">
           <h2 className="section-title">Popular queries</h2>
           {popular.themes.length > 0 && (
             <div className="popular-search__group">
@@ -299,7 +299,7 @@ export default function SearchPage() {
               </div>
             </div>
           )}
-        </section>
+        </div>
       )}
 
       {!showPopular && (
@@ -325,7 +325,13 @@ export default function SearchPage() {
           )}
 
           {tab === "themes" &&
-            themeResults.map((t) => <ThemeCard key={t.id} theme={t} />)}
+            themeResults.map((t) => (
+              <ThemeCard
+                key={t.id}
+                theme={t}
+                onDeleted={() => setThemeResults((prev) => prev.filter((x) => x.id !== t.id))}
+              />
+            ))}
 
           {tab === "users" &&
             userResults.map((u) => (

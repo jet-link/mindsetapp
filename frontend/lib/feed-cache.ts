@@ -93,3 +93,9 @@ export function updateAuthorAvatarInFeedCache(username: string, avatar: string |
     );
   });
 }
+
+export function removeThemeFromFeedCache(themeId: number) {
+  updateAllCaches((c) => {
+    c.themes = c.themes.filter((t) => t.id !== themeId);
+  });
+}

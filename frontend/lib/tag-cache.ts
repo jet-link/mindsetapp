@@ -50,3 +50,10 @@ export function updateThemeRepostInTagCaches(
     );
   }
 }
+
+export function removeThemeFromTagCaches(themeId: number) {
+  for (const slug of Object.keys(tagCaches)) {
+    const cache = tagCaches[slug];
+    cache.themes = cache.themes.filter((t) => t.id !== themeId);
+  }
+}

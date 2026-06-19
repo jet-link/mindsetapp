@@ -14,6 +14,8 @@ import {
   THEME_CREATED_EVENT,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
+  THEME_DELETED_EVENT,
+  ThemeDeletedDetail,
   ThemeLikeDetail,
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
@@ -347,9 +349,20 @@ export default function Feed() {
     };
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    const onThemeDeleted = (e: Event) => {
+      const { themeId } = (e as CustomEvent<ThemeDeletedDetail>).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice) => ({
+          ...slice,
+          themes: slice.themes.filter((t) => t.id !== themeId),
+        })),
+      );
+    };
+    window.addEventListener(THEME_DELETED_EVENT, onThemeDeleted);
     return () => {
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
+      window.removeEventListener(THEME_DELETED_EVENT, onThemeDeleted);
     };
   }, []);
 
@@ -462,7 +475,19 @@ export default function Feed() {
 
               <div className="feed-list">
                 {slice.themes.map((t) => (
-                  <ThemeCard key={`${tabId}-${t.id}`} theme={t} />
+                  <ThemeCard
+                    key={`${tabId}-${t.id}`}
+                    theme={t}
+                    onDeleted={() =>
+                      setSlices((prev) => ({
+                        ...prev,
+                        [tabId]: {
+                          ...prev[tabId],
+                          themes: prev[tabId].themes.filter((x) => x.id !== t.id),
+                        },
+                      }))
+                    }
+                  />
                 ))}
               </div>
 

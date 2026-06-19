@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useRef, useState, MouseEvent } from "react";
 import CardMenu from "@/components/CardMenu";
+import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
 import {
   REPLY_CREATED_EVENT,
@@ -13,6 +14,8 @@ import {
   ReplyCreatedDetail,
   ReplyLikeDetail,
   ReplyRepostDetail,
+  type ReplyDeletedDetail,
+  emitReplyDeleted,
   emitReplyLikeChanged,
   emitReplyRepostChanged,
   formatCount,
@@ -29,12 +32,14 @@ export default function ReplyCard({
   indented = false,
   clickable = false,
   threadLineBelow = false,
+  onDeleted,
 }: {
   reply: Reply;
   showViewTheme?: boolean;
   indented?: boolean;
   clickable?: boolean;
   threadLineBelow?: boolean;
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(reply.is_liked);
@@ -42,6 +47,8 @@ export default function ReplyCard({
   const [reposted, setReposted] = useState(reply.is_reposted);
   const [reposts, setReposts] = useState(reply.reposts_count);
   const [replies, setReplies] = useState(reply.replies_count);
+  const [exiting, setExiting] = useState(false);
+  const deletePending = useRef<ReplyDeletedDetail | null>(null);
 
   useEffect(() => {
     setReplies(reply.replies_count);
@@ -142,7 +149,17 @@ export default function ReplyCard({
   }
 
   return (
-    <article className={`card${indented ? " card--reply" : ""}`} data-anchor-reply={reply.id}>
+    <ListExitWrap
+      exiting={exiting}
+      onExitComplete={() => {
+        if (deletePending.current) {
+          emitReplyDeleted(deletePending.current);
+          deletePending.current = null;
+        }
+        onDeleted?.();
+      }}
+    >
+      <article className={`card${indented ? " card--reply" : ""}`} data-anchor-reply={reply.id}>
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >
@@ -160,7 +177,21 @@ export default function ReplyCard({
             </Link>
             <span className="time">· {reply.human_published}</span>
           </div>
-          <CardMenu kind="reply" path={`/reply/${reply.id}`} authorUsername={reply.author.username} />
+          <CardMenu
+            kind="reply"
+            path={`/reply/${reply.id}`}
+            authorUsername={reply.author.username}
+            itemId={reply.id}
+            createdAt={reply.created_at}
+            isDeletable={reply.is_deletable}
+            themeId={reply.theme_id}
+            parentId={reply.parent_id}
+            onDeleteStart={() => setExiting(true)}
+            onDeleteSuccess={(detail) => {
+              if (detail) deletePending.current = detail;
+            }}
+            onDeleteFailed={() => setExiting(false)}
+          />
         </div>
 
         <div
@@ -203,5 +234,6 @@ export default function ReplyCard({
         </div>
       </div>
     </article>
+    </ListExitWrap>
   );
 }

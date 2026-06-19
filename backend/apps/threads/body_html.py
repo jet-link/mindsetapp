@@ -1,7 +1,7 @@
 """Рендер body для Theme/Reply (перенос из liveblog mindset/body_html.py).
 
 Санитизация + linkify URL + хэштеги → ссылки на фронтовый роут
-(settings.MINDSET_TAG_URL_TEMPLATE) + YouTube-якоря → кликабельный постер.
+(settings.MINDSET_TAG_URL_TEMPLATE) + YouTube-ссылки → ссылка + iframe.
 """
 from __future__ import annotations
 
@@ -148,8 +148,7 @@ def _extract_youtube_id(url: str) -> str | None:
 
 
 def _embed_youtube_anchors(html: str) -> str:
-    """YouTube-ссылки → постер с Play-оверлеем (без iframe: у многих видео
-    встраивание отключено и iframe показал бы "Video unavailable")."""
+    """YouTube-ссылки → ссылка на видео + iframe-плеер."""
     if not html or 'youtu' not in html.lower():
         return html
 
@@ -160,15 +159,17 @@ def _embed_youtube_anchors(html: str) -> str:
             return m.group(0)
         safe_vid = escape(vid)
         watch_url = f'https://www.youtube.com/watch?v={safe_vid}'
-        thumb_url = f'https://i.ytimg.com/vi/{safe_vid}/hqdefault.jpg'
+        embed_url = f'https://www.youtube.com/embed/{safe_vid}'
         return (
-            f'<a class="mindset-embed mindset-embed--youtube" '
-            f'href="{watch_url}" target="_blank" rel="noopener noreferrer" '
-            f'aria-label="Watch on YouTube">'
-            f'<img class="mindset-embed__poster" src="{thumb_url}" '
-            f'alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
-            '<span class="mindset-embed__play" aria-hidden="true"></span>'
-            '</a>'
+            f'<div class="mindset-embed mindset-embed--youtube">'
+            f'<a class="mindset-embed__link" href="{watch_url}" target="_blank" '
+            f'rel="noopener noreferrer">{watch_url}</a>'
+            f'<div class="mindset-embed__frame">'
+            f'<iframe src="{embed_url}" title="YouTube video" loading="lazy" '
+            f'referrerpolicy="strict-origin-when-cross-origin" '
+            f'allow="accelerometer; autoplay; clipboard-write; encrypted-media; '
+            f'gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
+            f'</div></div>'
         )
 
     return _ANCHOR_WITH_HREF_RE.sub(replace, html)

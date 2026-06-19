@@ -217,6 +217,11 @@ class ThemeViewSet(viewsets.GenericViewSet):
         theme = self.get_object()
         if theme.author_id != request.user.pk:
             return Response(status=status.HTTP_403_FORBIDDEN)
+        if not theme.is_deletable:
+            return Response(
+                {'detail': 'Theme is no longer deletable.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         services.soft_delete_theme(theme=theme)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -297,7 +302,8 @@ class ReplyRepostView(generics.GenericAPIView):
 
 
 class ReplyDetailView(APIView):
-    """GET /replies/{pk}/ — ответ + его дочерние ответы (replies of reply)."""
+    """GET /replies/{pk}/ — ответ + его дочерние ответы (replies of reply).
+    DELETE /replies/{pk}/ — мягкое удаление автором (окно 24 ч)."""
 
     def get(self, request, pk):
         reply = get_object_or_404(
@@ -317,6 +323,20 @@ class ReplyDetailView(APIView):
             children, many=True, context=_reply_viewer_context(request, children)
         ).data
         return Response({'reply': reply_data, 'replies': children_data})
+
+    def delete(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        reply = get_object_or_404(Reply, pk=pk, is_deleted=False)
+        if reply.author_id != request.user.pk:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        if not reply.is_deletable:
+            return Response(
+                {'detail': 'Reply is no longer deletable.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = services.soft_delete_reply(reply=reply)
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class TagThemesView(generics.ListAPIView):

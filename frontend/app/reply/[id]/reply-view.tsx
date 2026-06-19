@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "@/app/thread/[id]/reply-form";
-import { Reply, REPLY_CREATED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyLikeDetail, ReplyRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
+import { Reply, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
 import { getReplyDetailCache, setReplyDetailCache } from "@/lib/detail-cache";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
@@ -22,6 +22,7 @@ export default function ReplyThreadView({
 }) {
   const initialCache = getReplyDetailCache(id);
   const pathname = usePathname();
+  const router = useRouter();
   const [reply, setReply] = useState<Reply | null>(initialCache?.reply ?? null);
   const [children, setChildren] = useState<Reply[]>(initialCache?.children ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
@@ -125,15 +126,26 @@ export default function ReplyThreadView({
         ),
       );
     };
+    const onReplyDeleted = (e: Event) => {
+      const { replyId, themeId, parentId, parentRepliesCount } = (
+        e as CustomEvent<ReplyDeletedDetail>
+      ).detail;
+      if (replyId === id) return;
+      if (parentId === id && parentRepliesCount !== undefined) {
+        setReply((prev) => (prev ? { ...prev, replies_count: parentRepliesCount } : prev));
+      }
+    };
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
     window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
     window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    window.addEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     return () => {
       window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
       window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
       window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+      window.removeEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     };
-  }, [id]);
+  }, [id, router]);
 
   if (loading && !reply) {
     return (
@@ -157,7 +169,11 @@ export default function ReplyThreadView({
       <PageHeader title="Reply detail" />
       <ReplyForm themeId={reply.theme_id} parentId={reply.id} onPosted={load} />
       <div className="thread-chain">
-        <ReplyCard reply={reply} threadLineBelow={children.length > 0} />
+        <ReplyCard
+          reply={reply}
+          threadLineBelow={children.length > 0}
+          onDeleted={() => router.push(`/thread/${reply.theme_id}`)}
+        />
         {children.length > 0 && <ThreadRepliesLabel />}
         <div className="thread-replies">
           {children.length === 0 && <p className="muted">No replies yet.</p>}
@@ -168,6 +184,7 @@ export default function ReplyThreadView({
               indented
               clickable
               threadLineBelow={i < children.length - 1}
+              onDeleted={() => setChildren((prev) => prev.filter((x) => x.id !== r.id))}
             />
           ))}
         </div>

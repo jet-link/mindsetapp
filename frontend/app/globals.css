@@ -88,9 +88,10 @@ a { color: inherit; text-decoration: none; }
   height: 58px;
   padding: 0 8px env(safe-area-inset-bottom);
   background: var(--bg);
-  border-top: 1px solid var(--border);
+  /* border-top: 1px solid var(--border); */
   align-items: center;
   justify-content: space-around;
+  gap: 8px;
 }
 .bottomnav__item {
   flex: 1;
@@ -104,6 +105,7 @@ a { color: inherit; text-decoration: none; }
 }
 .bottomnav__item:hover,
 .bottomnav__item.active {
+  background: var(--surface);
   color: var(--text);
 }
 .bottomnav__icon-wrap {
@@ -220,6 +222,45 @@ a { color: inherit; text-decoration: none; }
 }
 .sidenav__bars span:nth-child(1) { width: 22px; }
 .sidenav__bars span:nth-child(2) { width: 13px; }
+.sidenav__extras {
+  position: relative;
+  margin-top: auto;
+}
+.sidenav__extras-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  z-index: 30;
+}
+.sidenav__extras-item {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+.sidenav__extras-item:hover { background: var(--bubble); }
+.sidenav__extras-item .fa {
+  width: 18px;
+  text-align: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+/* Font Awesome 4: solid sun alias (glyph shared with fa-sun-o) */
+.fa-sun:before {
+  content: "\f185";
+}
 
 /* Поисковая строка */
 .search-bar {
@@ -235,6 +276,9 @@ a { color: inherit; text-decoration: none; }
   min-height: 44px;
   max-height: 44px;
   overflow: hidden;
+}
+.search-bar:focus-within {
+  outline: 2px solid #b9b9b9;
 }
 .search-bar input {
   flex: 1;
@@ -254,9 +298,6 @@ a { color: inherit; text-decoration: none; }
   text-overflow: ellipsis;
   -webkit-appearance: none;
   appearance: none;
-}
-.search-bar input:focus {
-  outline: none;
 }
 .search-bar input::-webkit-search-decoration,
 .search-bar input::-webkit-search-cancel-button,
@@ -424,7 +465,7 @@ a { color: inherit; text-decoration: none; }
 .card {
   display: flex;
   gap: 10px;
-  padding: var(--card-pad-x);
+  padding: var(--card-pad-x) 0;
   /* border-bottom: 1px solid var(--border); */
   background: transparent;
 }
@@ -515,6 +556,9 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-dim);
 }
 .card-menu__item:hover { background: var(--bubble); }
+.card-menu__item--danger { color: var(--error); }
+.card-menu__item--danger .fa { color: var(--error); }
+.card-menu__item--danger:hover { background: color-mix(in srgb, var(--error) 8%, var(--surface)); }
 
 .body-html--clickable {
   cursor: pointer;
@@ -560,20 +604,36 @@ a { color: inherit; text-decoration: none; }
 .body-html a.primary_ { color: #54a0ff; }
 .body-html a.mindset-hashtag { color: #54a0ff; font-weight: 600; }
 
-.mindset-embed { position: relative; display: block; max-width: 420px; margin-top: 8px; }
-.mindset-embed__poster { width: 100%; border-radius: 12px; display: block; }
-.mindset-embed__play {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
+.mindset-embed {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 8px;
 }
-.mindset-embed__play::after {
-  content: "▶";
-  font-size: 22px;
-  color: #fff;
-  background: rgba(0,0,0,0.65);
-  border-radius: 50%;
-  width: 54px; height: 54px;
-  display: flex; align-items: center; justify-content: center;
+.mindset-embed--youtube { display: flex; flex-direction: column; gap: 8px; }
+.mindset-embed__link {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #54a0ff;
+  word-break: break-all;
+}
+.mindset-embed__frame {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+.mindset-embed__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 14px;
 }
 
 /* Размер кнопок ~ как в Threads */
@@ -943,6 +1003,31 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   font: inherit;
 }
 .form-page input:focus { outline: 2px solid #b9b9b9; }
+.password-field {
+  position: relative;
+  align-self: stretch;
+}
+.password-field input {
+  width: 100%;
+  padding-right: 44px;
+  box-sizing: border-box;
+}
+.password-field__toggle {
+  all: unset;
+  cursor: pointer;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  border-radius: 8px;
+}
+.password-field__toggle:hover { color: var(--text); background: var(--bubble); }
 
 /* "Remember me" — компактный чекбокс, а не full-width input */
 .remember-me {
@@ -1424,6 +1509,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 
 /* Hover-карточка @mention (Threads-style) */
 .mention-hover-card {
+  display: block;
   background: #fff;
   border: none;
   border-radius: 16px;
@@ -1432,13 +1518,10 @@ textarea:focus { outline: 2px solid #b9b9b9; }
     0 0 0 1px rgba(0, 0, 0, 0.06),
     0 8px 30px rgba(0, 0, 0, 0.14);
   pointer-events: auto;
-}
-.mention-hover-card__link {
-  display: block;
   color: inherit;
   text-decoration: none;
 }
-.mention-hover-card__link:hover .mention-hover-card__name {
+.mention-hover-card:hover .mention-hover-card__name {
   text-decoration: underline;
 }
 .mention-hover-card__head {
@@ -1452,14 +1535,14 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   min-width: 0;
 }
 .mention-hover-card__name {
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--text);
 }
 .mention-hover-card__handle {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.2;
   color: var(--text-dim);
 }

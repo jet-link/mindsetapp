@@ -6,8 +6,10 @@ import ThemeCard from "@/components/ThemeCard";
 import {
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
+  THEME_DELETED_EVENT,
   REPLY_CREATED_EVENT,
   ReplyCreatedDetail,
+  ThemeDeletedDetail,
   ThemeLikeDetail,
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
@@ -119,11 +121,17 @@ export default function TagFeed({ slug }: { slug: string }) {
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+    const onThemeDeleted = (e: Event) => {
+      const { themeId } = (e as CustomEvent<ThemeDeletedDetail>).detail;
+      setThemes((prev) => prev.filter((t) => t.id !== themeId));
+    };
+    window.addEventListener(THEME_DELETED_EVENT, onThemeDeleted);
     return () => {
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
       window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
+      window.removeEventListener(THEME_DELETED_EVENT, onThemeDeleted);
     };
   }, []);
 
@@ -144,7 +152,11 @@ export default function TagFeed({ slug }: { slug: string }) {
 
       <div className="feed-list">
         {themes.map((t) => (
-          <ThemeCard key={t.id} theme={t} />
+          <ThemeCard
+            key={t.id}
+            theme={t}
+            onDeleted={() => setThemes((prev) => prev.filter((x) => x.id !== t.id))}
+          />
         ))}
       </div>
 

@@ -38,7 +38,7 @@ export default function MentionHoverLayer() {
   const [cardPos, setCardPos] = useState<{ top: number; left: number } | null>(null);
   const cacheRef = useRef(new Map<string, UserProfile>());
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLAnchorElement | HTMLDivElement>(null);
 
   useEffect(() => {
     hideCard(setAnchor, setProfile, setCardPos, hideTimer);
@@ -183,17 +183,63 @@ export default function MentionHoverLayer() {
 
   const dismiss = () => hideCard(setAnchor, setProfile, setCardPos, hideTimer);
 
+  const cardStyle = {
+    position: "fixed" as const,
+    top,
+    left,
+    width: cardWidth,
+    zIndex: 120,
+  };
+
+  const cardBody = profile ? (
+    <>
+      <div className="mention-hover-card__head">
+        <div className="mention-hover-card__identity">
+          <div className="mention-hover-card__name">{profile.username}</div>
+          <div className="mention-hover-card__handle">@{profile.username}</div>
+        </div>
+        <div className="mention-hover-card__avatar">
+          <Avatar username={profile.username} src={profile.avatar} />
+        </div>
+      </div>
+      {profile.bio ? <div className="mention-hover-card__bio">{profile.bio}</div> : null}
+      <div className="mention-hover-card__stats">
+        {formatCount(profile.followers_count)} followers
+        <span className="mention-hover-card__sep"> · </span>
+        {formatCount(profile.following_count)} following
+      </div>
+    </>
+  ) : (
+    <p className="muted mention-hover-card__loading">Loading…</p>
+  );
+
+  if (profile) {
+    return (
+      <Link
+        ref={cardRef as React.RefObject<HTMLAnchorElement>}
+        href={`/u/${profile.username}`}
+        className="mention-hover-card"
+        style={cardStyle}
+        onClick={dismiss}
+        onMouseEnter={() => {
+          if (hideTimer.current) clearTimeout(hideTimer.current);
+        }}
+        onMouseLeave={() => {
+          hideTimer.current = setTimeout(() => {
+            hideCard(setAnchor, setProfile, setCardPos, hideTimer);
+          }, 180);
+        }}
+      >
+        {cardBody}
+      </Link>
+    );
+  }
+
   return (
     <div
-      ref={cardRef}
+      ref={cardRef as React.RefObject<HTMLDivElement>}
       className="mention-hover-card"
-      style={{
-        position: "fixed",
-        top,
-        left,
-        width: cardWidth,
-        zIndex: 120,
-      }}
+      style={cardStyle}
       onMouseEnter={() => {
         if (hideTimer.current) clearTimeout(hideTimer.current);
       }}
@@ -203,35 +249,7 @@ export default function MentionHoverLayer() {
         }, 180);
       }}
     >
-      {profile ? (
-        <>
-          <Link
-            href={`/u/${profile.username}`}
-            className="mention-hover-card__link"
-            onClick={dismiss}
-          >
-            <div className="mention-hover-card__head">
-              <div className="mention-hover-card__identity">
-                <div className="mention-hover-card__name">{profile.username}</div>
-                <div className="mention-hover-card__handle">@{profile.username}</div>
-              </div>
-              <div className="mention-hover-card__avatar">
-                <Avatar username={profile.username} src={profile.avatar} />
-              </div>
-            </div>
-            {profile.bio ? (
-              <div className="mention-hover-card__bio">{profile.bio}</div>
-            ) : null}
-            <div className="mention-hover-card__stats">
-              {formatCount(profile.followers_count)} followers
-              <span className="mention-hover-card__sep"> · </span>
-              {formatCount(profile.following_count)} following
-            </div>
-          </Link>
-        </>
-      ) : (
-        <p className="muted mention-hover-card__loading">Loading…</p>
-      )}
+      {cardBody}
     </div>
   );
 }

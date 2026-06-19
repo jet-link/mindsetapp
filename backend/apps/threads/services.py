@@ -123,5 +123,48 @@ def share_theme(*, theme: Theme, user) -> bool:
 
 
 def soft_delete_theme(*, theme: Theme) -> None:
+    if theme.is_deleted:
+        return
     theme.is_deleted = True
     theme.save(update_fields=['is_deleted', 'updated_at'])
+
+
+def soft_delete_reply(*, reply: Reply) -> dict:
+    """Мягкое удаление ответа; возвращает обновлённые счётчики для API."""
+    from django.db.models import F
+    from django.db.models.functions import Greatest
+
+    if reply.is_deleted:
+        theme = Theme.objects.get(pk=reply.theme_id)
+        payload = {
+            'theme_id': reply.theme_id,
+            'parent_id': reply.parent_id,
+            'theme_replies_count': theme.replies_count,
+        }
+        if reply.parent_id:
+            parent = Reply.objects.get(pk=reply.parent_id)
+            payload['parent_replies_count'] = parent.replies_count
+        return payload
+
+    reply.is_deleted = True
+    reply.save(update_fields=['is_deleted', 'updated_at'])
+
+    if reply.parent_id is None:
+        Theme.objects.filter(pk=reply.theme_id).update(
+            replies_count=Greatest(F('replies_count') - 1, 0),
+        )
+    else:
+        Reply.objects.filter(pk=reply.parent_id).update(
+            replies_count=Greatest(F('replies_count') - 1, 0),
+        )
+
+    theme = Theme.objects.get(pk=reply.theme_id)
+    payload = {
+        'theme_id': reply.theme_id,
+        'parent_id': reply.parent_id,
+        'theme_replies_count': theme.replies_count,
+    }
+    if reply.parent_id:
+        parent = Reply.objects.get(pk=reply.parent_id)
+        payload['parent_replies_count'] = parent.replies_count
+    return payload

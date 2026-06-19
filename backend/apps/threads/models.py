@@ -16,6 +16,7 @@ from django.utils.text import slugify
 from apps.core.text import human_time_relative
 
 EDITABLE_HOURS = 12
+DELETABLE_HOURS = 24
 
 
 class Hashtag(models.Model):
@@ -84,6 +85,14 @@ class Theme(models.Model):
         return timezone.now() <= self.editable_until
 
     @property
+    def deletable_until(self):
+        return self.created_at + timedelta(hours=DELETABLE_HOURS)
+
+    @property
+    def is_deletable(self) -> bool:
+        return timezone.now() <= self.deletable_until
+
+    @property
     def preview(self) -> str:
         text = (self.body_text or '').strip()
         if len(text) <= 80:
@@ -135,6 +144,14 @@ class Reply(models.Model):
     @property
     def is_editable(self) -> bool:
         return timezone.now() <= self.editable_until
+
+    @property
+    def deletable_until(self):
+        return self.created_at + timedelta(hours=DELETABLE_HOURS)
+
+    @property
+    def is_deletable(self) -> bool:
+        return timezone.now() <= self.deletable_until
 
 
 class ThemeImage(models.Model):

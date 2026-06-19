@@ -7,6 +7,8 @@ import {
   applyReplyRepostChanged,
   applyThemeLikeChanged,
   applyThemeRepostChanged,
+  applyThemeDeleted,
+  applyReplyDeleted,
 } from "./detail-cache";
 import {
   prependThemeToFeedCache,
@@ -15,6 +17,7 @@ import {
   updateThemeLikeInFeedCache,
   updateThemeRepostInFeedCache,
   removeAuthorFromFollowingFeedCache,
+  removeThemeFromFeedCache,
   clearFeedCache,
 } from "./feed-cache";
 import {
@@ -24,11 +27,14 @@ import {
   updateThemeRepliesInProfileCache,
   updateReplyLikeInProfileCache,
   updateReplyRepostInProfileCache,
+  removeThemeFromProfileCache,
+  removeReplyFromProfileCache,
 } from "./profile-tabs-cache";
 import {
   updateThemeRepliesInTagCaches,
   updateThemeLikeInTagCaches,
   updateThemeRepostInTagCaches,
+  removeThemeFromTagCaches,
 } from "./tag-cache";
 import { setUserAvatarOverride } from "./user-avatar-store";
 
@@ -87,6 +93,7 @@ export interface Theme {
   created_at: string;
   human_published: string;
   is_editable: boolean;
+  is_deletable: boolean;
 }
 
 export interface Reply {
@@ -102,6 +109,7 @@ export interface Reply {
   is_reposted: boolean;
   created_at: string;
   human_published: string;
+  is_deletable: boolean;
 }
 
 export interface ProfileReply extends Reply {
@@ -276,7 +284,10 @@ export async function apiFetch<T>(
     const body = await res.text();
     throw new Error(humanizeApiError(res.status, body));
   }
-  return res.json() as Promise<T>;
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 /** Есть ли сохраненный JWT (только в браузере). */
@@ -468,6 +479,19 @@ export const toggleReplyLike = (replyId: number) =>
 export const toggleReplyRepost = (replyId: number) =>
   apiFetch<{ reposted: boolean; reposts_count: number }>(
     `/api/v1/replies/${replyId}/repost/`, { method: "POST" });
+
+export const deleteTheme = (themeId: number) =>
+  apiFetch<void>(`/api/v1/themes/${themeId}/`, { method: "DELETE" });
+
+export interface DeleteReplyResponse {
+  theme_id: number;
+  parent_id: number | null;
+  theme_replies_count: number;
+  parent_replies_count?: number;
+}
+
+export const deleteReply = (replyId: number) =>
+  apiFetch<DeleteReplyResponse>(`/api/v1/replies/${replyId}/`, { method: "DELETE" });
 
 // --- Users / Tags ---
 export const getProfile = (username: string) =>
@@ -773,5 +797,47 @@ export function emitReplyRepostChanged(detail: ReplyRepostDetail) {
   applyReplyRepostChanged(detail.replyId, detail.reposted, detail.reposts_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_REPOST_EVENT, { detail }));
+  }
+}
+
+export const THEME_DELETED_EVENT = "mindset-theme-deleted";
+
+export interface ThemeDeletedDetail {
+  themeId: number;
+}
+
+export function emitThemeDeleted(detail: ThemeDeletedDetail) {
+  removeThemeFromFeedCache(detail.themeId);
+  removeThemeFromTagCaches(detail.themeId);
+  removeThemeFromProfileCache(detail.themeId);
+  applyThemeDeleted(detail.themeId);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(THEME_DELETED_EVENT, { detail }));
+  }
+}
+
+export const REPLY_DELETED_EVENT = "mindset-reply-deleted";
+
+export interface ReplyDeletedDetail {
+  replyId: number;
+  themeId: number;
+  parentId: number | null;
+  themeRepliesCount: number;
+  parentRepliesCount?: number;
+}
+
+export function emitReplyDeleted(detail: ReplyDeletedDetail) {
+  updateThemeRepliesInFeedCache(detail.themeId, detail.themeRepliesCount);
+  updateThemeRepliesInTagCaches(detail.themeId, detail.themeRepliesCount);
+  updateThemeRepliesInProfileCache(
+    detail.themeId,
+    detail.themeRepliesCount,
+    detail.parentId,
+    detail.parentRepliesCount,
+  );
+  removeReplyFromProfileCache(detail.replyId, detail.themeId);
+  applyReplyDeleted(detail);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(REPLY_DELETED_EVENT, { detail }));
   }
 }

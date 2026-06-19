@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AUTH_EVENT, getStoredUsername, isLoggedIn } from "@/lib/api";
+import {
+  AUTH_EVENT,
+  deleteReply,
+  deleteTheme,
+  type ReplyDeletedDetail,
+  getStoredUsername,
+  isLoggedIn,
+} from "@/lib/api";
+import { isWithinDeleteWindow } from "@/lib/deletable";
 
 type Kind = "theme" | "reply";
 
@@ -9,10 +17,24 @@ export default function CardMenu({
   kind,
   path,
   authorUsername,
+  itemId,
+  createdAt,
+  isDeletable,
+  onDeleteStart,
+  onDeleteSuccess,
+  onDeleteFailed,
 }: {
   kind: Kind;
   path: string;
   authorUsername: string;
+  itemId: number;
+  createdAt: string;
+  isDeletable?: boolean;
+  themeId?: number;
+  parentId?: number | null;
+  onDeleteStart?: () => void;
+  onDeleteSuccess?: (replyDetail?: ReplyDeletedDetail) => void;
+  onDeleteFailed?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -22,6 +44,8 @@ export default function CardMenu({
 
   const copyLabel = kind === "theme" ? "Copy theme link" : "Copy reply link";
   const copiedLabel = kind === "theme" ? "Theme link was copied!" : "Reply link was copied!";
+  const canDelete =
+    isOwn && (isDeletable ?? isWithinDeleteWindow(createdAt));
 
   useEffect(() => {
     const syncAuth = () => {
@@ -54,6 +78,28 @@ export default function CardMenu({
     setTimeout(() => setCopiedToast(false), 3500);
   }
 
+  async function onDelete() {
+    setOpen(false);
+    onDeleteStart?.();
+    try {
+      if (kind === "theme") {
+        await deleteTheme(itemId);
+        onDeleteSuccess?.();
+      } else {
+        const r = await deleteReply(itemId);
+        onDeleteSuccess?.({
+          replyId: itemId,
+          themeId: r.theme_id,
+          parentId: r.parent_id,
+          themeRepliesCount: r.theme_replies_count,
+          parentRepliesCount: r.parent_replies_count,
+        });
+      }
+    } catch {
+      onDeleteFailed?.();
+    }
+  }
+
   return (
     <div className="card-menu" ref={rootRef}>
       <button
@@ -76,6 +122,17 @@ export default function CardMenu({
             <i className="fa fa-link" aria-hidden="true" />
             {copyLabel}
           </button>
+          {canDelete && (
+            <button
+              type="button"
+              className="card-menu__item card-menu__item--danger"
+              role="menuitem"
+              onClick={onDelete}
+            >
+              <i className="fa fa-trash-o" aria-hidden="true" />
+              Delete
+            </button>
+          )}
           {authed && !isOwn && (
             <button
               type="button"

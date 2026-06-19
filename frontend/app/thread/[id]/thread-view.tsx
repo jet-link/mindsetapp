@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
 import ReplyForm from "./reply-form";
-import { Reply, Theme, REPLY_CREATED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyLikeDetail, ReplyRepostDetail, THEME_LIKE_EVENT, THEME_REPOST_EVENT, ThemeLikeDetail, ThemeRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
+import { Reply, Theme, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, THEME_LIKE_EVENT, THEME_REPOST_EVENT, ThemeLikeDetail, ThemeRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
 import { getThreadCache, setThreadCache } from "@/lib/detail-cache";
 import { setListKey } from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
@@ -24,6 +24,7 @@ export default function ThreadView({
 }) {
   const initialCache = getThreadCache(id);
   const pathname = usePathname();
+  const router = useRouter();
   const [theme, setTheme] = useState<Theme | null>(initialCache?.theme ?? null);
   const [replies, setReplies] = useState<Reply[]>(initialCache?.replies ?? []);
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
@@ -144,19 +145,26 @@ export default function ThreadView({
         ),
       );
     };
+    const onReplyDeleted = (e: Event) => {
+      const { themeId, themeRepliesCount } = (e as CustomEvent<ReplyDeletedDetail>).detail;
+      if (themeId !== id) return;
+      setTheme((prev) => (prev ? { ...prev, replies_count: themeRepliesCount } : prev));
+    };
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
     window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
     window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    window.addEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     return () => {
       window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
       window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
       window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+      window.removeEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     };
-  }, [id]);
+  }, [id, router]);
 
   if (loading && !theme) {
     return (
@@ -184,6 +192,7 @@ export default function ThreadView({
           theme={theme}
           clickable={false}
           threadLineBelow={replies.length > 0}
+          onDeleted={() => router.push("/")}
         />
         {replies.length > 0 && <ThreadRepliesLabel />}
         <div className="thread-replies">
@@ -195,6 +204,7 @@ export default function ThreadView({
               indented
               clickable
               threadLineBelow={i < replies.length - 1}
+              onDeleted={() => setReplies((prev) => prev.filter((x) => x.id !== r.id))}
             />
           ))}
         </div>

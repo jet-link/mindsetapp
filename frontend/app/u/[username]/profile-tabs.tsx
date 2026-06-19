@@ -15,6 +15,10 @@ import {
   ReplyRepostDetail,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
+  THEME_DELETED_EVENT,
+  ThemeDeletedDetail,
+  REPLY_DELETED_EVENT,
+  ReplyDeletedDetail,
   Theme,
   ThemeLikeDetail,
   ThemeRepostDetail,
@@ -240,6 +244,25 @@ export default function ProfileTabs({
     },
     [username],
   );
+
+  const removeThemeFromSlices = useCallback((themeId: number) => {
+    setSlices((prev) =>
+      mapSlices(prev, (slice) => ({
+        ...slice,
+        themes: slice.themes.filter((t) => t.id !== themeId),
+        replies: slice.replies.filter((r) => r.theme.id !== themeId),
+      })),
+    );
+  }, []);
+
+  const removeReplyFromSlices = useCallback((replyId: number) => {
+    setSlices((prev) =>
+      mapSlices(prev, (slice) => ({
+        ...slice,
+        replies: slice.replies.filter((r) => r.id !== replyId),
+      })),
+    );
+  }, []);
 
   const handleRepostChange = useCallback(
     (
@@ -572,12 +595,45 @@ export default function ProfileTabs({
         })),
       );
     };
+    const onThemeDeleted = (e: Event) => {
+      const { themeId } = (e as CustomEvent<ThemeDeletedDetail>).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice, tabId) => ({
+          ...slice,
+          themes: slice.themes.filter((t) => t.id !== themeId),
+          replies: slice.replies.filter((r) => r.theme.id !== themeId),
+        })),
+      );
+    };
+    const onReplyDeleted = (e: Event) => {
+      const { replyId, themeId, themeRepliesCount, parentRepliesCount } = (
+        e as CustomEvent<ReplyDeletedDetail>
+      ).detail;
+      setSlices((prev) =>
+        mapSlices(prev, (slice) => ({
+          ...slice,
+          themes: slice.themes.map((t) =>
+            t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
+          ),
+          replies: slice.replies
+            .filter((r) => r.id !== replyId)
+            .map((r) => {
+              if (r.theme.id === themeId) {
+                return { ...r, theme: { ...r.theme, replies_count: themeRepliesCount } };
+              }
+              return r;
+            }),
+        })),
+      );
+    };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
     window.addEventListener(REPLY_LIKE_EVENT, onReplyLike);
     window.addEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+    window.addEventListener(THEME_DELETED_EVENT, onThemeDeleted);
+    window.addEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     return () => {
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
@@ -585,6 +641,8 @@ export default function ProfileTabs({
       window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
       window.removeEventListener(REPLY_LIKE_EVENT, onReplyLike);
       window.removeEventListener(REPLY_REPOST_EVENT, onReplyRepost);
+      window.removeEventListener(THEME_DELETED_EVENT, onThemeDeleted);
+      window.removeEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     };
   }, [scheduleRepostRemove, username]);
 
@@ -668,8 +726,18 @@ export default function ProfileTabs({
                   ? slice.replies.map((r) => (
                       <div key={`r-${r.id}`} className="profile-reply-thread">
                         <div className="thread-chain">
-                          <ThemeCard theme={r.theme} threadLineBelow {...themeRepostProps} />
-                          <ReplyCard reply={r} indented clickable />
+                          <ThemeCard
+                            theme={r.theme}
+                            threadLineBelow
+                            {...themeRepostProps}
+                            onDeleted={() => removeThemeFromSlices(r.theme.id)}
+                          />
+                          <ReplyCard
+                            reply={r}
+                            indented
+                            clickable
+                            onDeleted={() => removeReplyFromSlices(r.id)}
+                          />
                         </div>
                       </div>
                     ))
@@ -680,11 +748,20 @@ export default function ProfileTabs({
                           exiting={exitingRepostIds.has(t.id)}
                           onExitComplete={() => removeRepostFromSlice(t.id)}
                         >
-                          <ThemeCard theme={t} {...themeRepostProps} />
+                          <ThemeCard
+                            theme={t}
+                            {...themeRepostProps}
+                            onDeleted={() => removeThemeFromSlices(t.id)}
+                          />
                         </ListExitWrap>
                       ))
                     : slice.themes.map((t) => (
-                        <ThemeCard key={`${tabId}-${t.id}`} theme={t} {...themeRepostProps} />
+                        <ThemeCard
+                          key={`${tabId}-${t.id}`}
+                          theme={t}
+                          {...themeRepostProps}
+                          onDeleted={() => removeThemeFromSlices(t.id)}
+                        />
                       ))}
               </div>
 

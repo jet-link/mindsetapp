@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useRef, useState, MouseEvent } from "react";
 import CardMenu from "@/components/CardMenu";
+import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
 import {
   REPLY_CREATED_EVENT,
@@ -13,6 +14,7 @@ import {
   Theme,
   ThemeLikeDetail,
   ThemeRepostDetail,
+  emitThemeDeleted,
   emitThemeLikeChanged,
   emitThemeRepostChanged,
   formatCount,
@@ -29,6 +31,7 @@ export default function ThemeCard({
   clickable = true,
   threadLineBelow = false,
   onRepostChange,
+  onDeleted,
 }: {
   theme: Theme;
   clickable?: boolean;
@@ -38,6 +41,7 @@ export default function ThemeCard({
     reposted: boolean,
     options?: { theme?: Theme; immediate?: boolean },
   ) => void;
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
@@ -45,6 +49,8 @@ export default function ThemeCard({
   const [reposted, setReposted] = useState(theme.is_reposted);
   const [reposts, setReposts] = useState(theme.reposts_count);
   const [replies, setReplies] = useState(theme.replies_count);
+  const [exiting, setExiting] = useState(false);
+  const deletePending = useRef(false);
 
   useEffect(() => {
     setReplies(theme.replies_count);
@@ -166,7 +172,17 @@ export default function ThemeCard({
   }
 
   return (
-    <article className="card" data-anchor-theme={theme.id}>
+    <ListExitWrap
+      exiting={exiting}
+      onExitComplete={() => {
+        if (deletePending.current) {
+          emitThemeDeleted({ themeId: theme.id });
+          deletePending.current = false;
+        }
+        onDeleted?.();
+      }}
+    >
+      <article className="card" data-anchor-theme={theme.id}>
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >
@@ -184,7 +200,19 @@ export default function ThemeCard({
             </Link>
             <span className="time">· {theme.human_published}</span>
           </div>
-          <CardMenu kind="theme" path={`/thread/${theme.id}`} authorUsername={theme.author.username} />
+          <CardMenu
+            kind="theme"
+            path={`/thread/${theme.id}`}
+            authorUsername={theme.author.username}
+            itemId={theme.id}
+            createdAt={theme.created_at}
+            isDeletable={theme.is_deletable}
+            onDeleteStart={() => setExiting(true)}
+            onDeleteSuccess={() => {
+              deletePending.current = true;
+            }}
+            onDeleteFailed={() => setExiting(false)}
+          />
         </div>
 
         <div
@@ -242,5 +270,6 @@ export default function ThemeCard({
         </div>
       </div>
     </article>
+    </ListExitWrap>
   );
 }

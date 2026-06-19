@@ -124,3 +124,46 @@ export function applyReplyLikeChanged(replyId: number, liked: boolean, likesCoun
 export function applyReplyRepostChanged(replyId: number, reposted: boolean, repostsCount: number) {
   patchReplyInCaches(replyId, { is_reposted: reposted, reposts_count: repostsCount });
 }
+
+export function applyThemeDeleted(themeId: number) {
+  threadCaches.delete(themeId);
+  for (const [cacheId, snap] of replyCaches) {
+    if (snap.reply.theme_id === themeId) replyCaches.delete(cacheId);
+  }
+}
+
+export function applyReplyDeleted(detail: {
+  replyId: number;
+  themeId: number;
+  parentId: number | null;
+  themeRepliesCount: number;
+  parentRepliesCount?: number;
+}) {
+  const { replyId, themeId, parentId, themeRepliesCount, parentRepliesCount } = detail;
+
+  const threadSnap = threadCaches.get(themeId);
+  if (threadSnap) {
+    threadCaches.set(themeId, {
+      theme: { ...threadSnap.theme, replies_count: themeRepliesCount },
+      replies: threadSnap.replies.filter((r) => r.id !== replyId).map((r) =>
+        parentId != null && r.id === parentId && parentRepliesCount !== undefined
+          ? { ...r, replies_count: parentRepliesCount }
+          : r,
+      ),
+    });
+  }
+
+  replyCaches.delete(replyId);
+  if (parentId != null) {
+    const parentSnap = replyCaches.get(parentId);
+    if (parentSnap) {
+      replyCaches.set(parentId, {
+        reply:
+          parentRepliesCount !== undefined
+            ? { ...parentSnap.reply, replies_count: parentRepliesCount }
+            : parentSnap.reply,
+        children: parentSnap.children.filter((r) => r.id !== replyId),
+      });
+    }
+  }
+}

@@ -131,3 +131,21 @@ export function updateReplyRepostInProfileCache(
     ),
   }));
 }
+
+export function removeThemeFromProfileCache(themeId: number) {
+  mapCachedSlices((slice, tab) => {
+    const themes = slice.themes.filter((t) => t.id !== themeId);
+    const replies = slice.replies.filter((r) => r.theme.id !== themeId);
+    if (tab === "reposts") {
+      return { ...slice, themes };
+    }
+    return { ...slice, themes, replies };
+  });
+}
+
+export function removeReplyFromProfileCache(replyId: number, _themeId: number) {
+  mapCachedSlices((slice) => ({
+    ...slice,
+    replies: slice.replies.filter((r) => r.id !== replyId),
+  }));
+}

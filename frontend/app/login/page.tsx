@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [authErrorKind, setAuthErrorKind] = useState<AuthErrorKind>(null);
@@ -182,20 +183,31 @@ export default function LoginPage() {
         </>
       )}
 
-      <label className="sr-only" htmlFor="login-password">
-        Password
-      </label>
-      <input
-        id="login-password"
-        name="password"
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => onPasswordChange(e.target.value)}
-        autoComplete={mode === "login" ? "current-password" : "new-password"}
-        className={passwordInvalid ? "input-error" : ""}
-        aria-invalid={passwordInvalid}
-      />
+      <div className={`password-field${passwordInvalid ? " password-field--error" : ""}`}>
+        <label className="sr-only" htmlFor="login-password">
+          Password
+        </label>
+        <input
+          id="login-password"
+          name="password"
+          placeholder="Password"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          autoComplete={mode === "login" ? "current-password" : "new-password"}
+          className={passwordInvalid ? "input-error" : ""}
+          aria-invalid={passwordInvalid}
+        />
+        <button
+          type="button"
+          className="password-field__toggle"
+          onClick={() => setShowPassword((v) => !v)}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+          title={showPassword ? "Hide password" : "Show password"}
+        >
+          <i className={`fa ${showPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
+        </button>
+      </div>
 
       {mode === "login" && (
         <label className="remember-me">

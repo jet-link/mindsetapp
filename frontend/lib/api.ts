@@ -21,7 +21,10 @@ import {
   clearFeedCache,
 } from "./feed-cache";
 import {
+  buildProfileReplyFromCreated,
   clearProfileTabsCache,
+  prependReplyToProfileCache,
+  prependThemeToProfileCache,
   updateThemeLikeInProfileCache,
   updateThemeRepostInProfileCache,
   updateThemeRepliesInProfileCache,
@@ -735,6 +738,7 @@ export const THEME_CREATED_EVENT = "mindset-theme-created";
 
 export function emitThemeCreated(theme: Theme) {
   prependThemeToFeedCache(theme);
+  prependThemeToProfileCache(theme);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(THEME_CREATED_EVENT, { detail: theme }));
   }
@@ -759,6 +763,8 @@ export function emitReplyCreated(detail: ReplyCreatedDetail) {
     detail.parentId,
     detail.parentRepliesCount,
   );
+  const profileReply = buildProfileReplyFromCreated(detail);
+  if (profileReply) prependReplyToProfileCache(profileReply);
   applyReplyCreated(detail);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_CREATED_EVENT, { detail }));
@@ -798,6 +804,7 @@ export function emitThemeRepostChanged(detail: ThemeRepostDetail) {
   applyThemeRepostChanged(detail.themeId, detail.reposted, detail.reposts_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(THEME_REPOST_EVENT, { detail }));
+    if (!detail.reposted) emitNotificationsChanged();
   }
 }
 
@@ -872,5 +879,6 @@ export function emitReplyDeleted(detail: ReplyDeletedDetail) {
   applyReplyDeleted(detail);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_DELETED_EVENT, { detail }));
+    emitNotificationsChanged();
   }
 }

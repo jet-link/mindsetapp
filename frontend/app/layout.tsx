@@ -3,6 +3,7 @@ import BottomNav from "@/components/BottomNav";
 import MentionHoverLayer from "@/components/MentionHoverLayer";
 import MobileHeader from "@/components/MobileHeader";
 import RouteTitle from "@/components/RouteTitle";
+import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
 import SideNav from "@/components/SideNav";
 import "./globals.css";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body suppressHydrationWarning>
+        <ServiceWorkerCleanup />
         <RouteTitle />
         <MobileHeader />
         <SideNav />

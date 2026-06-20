@@ -1,4 +1,6 @@
-import type { ProfileReply, Theme } from "@/lib/api";
+import type { ProfileReply, ReplyCreatedDetail, Theme } from "@/lib/api";
+import { getStoredUsername } from "@/lib/api";
+import { findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 
 export type ProfileTab = "themes" | "replies" | "media" | "reposts";
 
@@ -168,4 +170,47 @@ export function findReplyInProfileCache(replyId: number): ProfileReply | null {
     if (hit) return hit;
   }
   return null;
+}
+
+export function buildProfileReplyFromCreated(
+  detail: ReplyCreatedDetail,
+): ProfileReply | null {
+  const username = getStoredUsername();
+  if (!username || detail.reply.author.username !== username) return null;
+  const theme = findThemeInAllCaches(detail.themeId);
+  if (!theme) return null;
+  return {
+    ...detail.reply,
+    theme: { ...theme, replies_count: detail.themeRepliesCount },
+  };
+}
+
+export function prependThemeToProfileCache(theme: Theme) {
+  const username = getStoredUsername();
+  if (!username || theme.author.username !== username || !profileTabsCache) return;
+  if (profileTabsCache.username !== username) return;
+  mapCachedSlices((slice, tab) => {
+    if (tab !== "themes") return slice;
+    if (slice.themes.some((t) => t.id === theme.id)) return slice;
+    return {
+      ...slice,
+      themes: [theme, ...slice.themes],
+      loaded: true,
+    };
+  });
+}
+
+export function prependReplyToProfileCache(profileReply: ProfileReply) {
+  const username = getStoredUsername();
+  if (!username || profileReply.author.username !== username || !profileTabsCache) return;
+  if (profileTabsCache.username !== username) return;
+  mapCachedSlices((slice, tab) => {
+    if (tab !== "replies") return slice;
+    if (slice.replies.some((r) => r.id === profileReply.id)) return slice;
+    return {
+      ...slice,
+      replies: [profileReply, ...slice.replies],
+      loaded: true,
+    };
+  });
 }

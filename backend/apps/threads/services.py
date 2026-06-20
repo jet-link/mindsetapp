@@ -10,7 +10,7 @@ from typing import Sequence
 from django.db import transaction
 
 from apps.core.text import html_to_plain_text
-from apps.notifications.services import notify
+from apps.notifications.services import delete_repost_notification, delete_reply_notifications, notify
 
 from .body_html import extract_hashtags, normalise_hashtags, render_body
 from .image_service import attach_reply_image, attach_theme_images
@@ -92,6 +92,7 @@ def toggle_theme_repost(*, theme: Theme, user) -> bool:
         notify(recipient=theme.author, actor=user, verb='repost', theme=theme)
         return True
     obj.delete()
+    delete_repost_notification(recipient=theme.author, actor=user, theme=theme)
     return False
 
 
@@ -145,6 +146,8 @@ def soft_delete_reply(*, reply: Reply) -> dict:
             parent = Reply.objects.get(pk=reply.parent_id)
             payload['parent_replies_count'] = parent.replies_count
         return payload
+
+    delete_reply_notifications(reply=reply)
 
     reply.is_deleted = True
     reply.save(update_fields=['is_deleted', 'updated_at'])

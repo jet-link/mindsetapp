@@ -10,6 +10,7 @@ import {
   register,
 } from "@/lib/api";
 import { setPageTitle } from "@/components/RouteTitle";
+import GoogleIcon from "@/components/GoogleIcon";
 
 type AuthErrorKind = "user_not_found" | "password_incorrect" | null;
 type RegisterField = keyof RegisterFieldErrors;
@@ -236,6 +237,19 @@ export default function LoginPage() {
         onClick={toggleMode}
       >
         {mode === "login" ? "No account? Sign up" : "Already have an account? Log in"}
+      </button>
+
+      <div className="auth-divider" aria-hidden="true">
+        <span>or</span>
+      </div>
+
+      <button
+        type="button"
+        className="btn btn--ghost btn--google"
+        aria-label="Sign up with Google"
+      >
+        <GoogleIcon />
+        Sign up with Google
       </button>
     </form>
   );

@@ -8,22 +8,26 @@ import ThemeCard from "@/components/ThemeCard";
 import {
   AUTH_EVENT,
   REPLY_CREATED_EVENT,
+  REPLY_DELETED_EVENT,
   REPLY_LIKE_EVENT,
   REPLY_REPOST_EVENT,
   ReplyCreatedDetail,
+  ReplyDeletedDetail,
   ReplyLikeDetail,
   ReplyRepostDetail,
+  THEME_CREATED_EVENT,
   THEME_LIKE_EVENT,
   THEME_REPOST_EVENT,
   THEME_DELETED_EVENT,
   ThemeDeletedDetail,
-  REPLY_DELETED_EVENT,
-  ReplyDeletedDetail,
   Theme,
   ThemeLikeDetail,
   ThemeRepostDetail,
+  ProfileReply,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
+  emitReplyDeleted,
+  emitThemeDeleted,
   getStoredUsername,
   getUserMedia,
   getUserReplies,
@@ -34,9 +38,11 @@ import {
   ProfileTab,
   ProfileSlice,
   PROFILE_TABS,
+  buildProfileReplyFromCreated,
   getProfileTabsCache,
   setProfileTabsCache,
 } from "@/lib/profile-tabs-cache";
+import { findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 import {
   findReturnAnchorByPrefix,
@@ -125,6 +131,63 @@ function prependToRepostsSlice(
   };
 }
 
+function prependThemeToSlice(
+  slices: Record<ProfileTab, TabSlice>,
+  theme: Theme,
+): Record<ProfileTab, TabSlice> {
+  const themesSlice = slices.themes;
+  if (themesSlice.themes.some((t) => t.id === theme.id)) return slices;
+  return {
+    ...slices,
+    themes: {
+      ...themesSlice,
+      themes: [theme, ...themesSlice.themes],
+      loaded: true,
+    },
+  };
+}
+
+function prependReplyToSlice(
+  slices: Record<ProfileTab, TabSlice>,
+  profileReply: ProfileReply,
+): Record<ProfileTab, TabSlice> {
+  const repliesSlice = slices.replies;
+  if (repliesSlice.replies.some((r) => r.id === profileReply.id)) return slices;
+  return {
+    ...slices,
+    replies: {
+      ...repliesSlice,
+      replies: [profileReply, ...repliesSlice.replies],
+      loaded: true,
+    },
+  };
+}
+
+function patchReplyCountsInSlices(
+  slices: Record<ProfileTab, TabSlice>,
+  themeId: number,
+  parentId: number | null,
+  themeRepliesCount: number,
+  parentRepliesCount?: number,
+): Record<ProfileTab, TabSlice> {
+  return mapSlices(slices, (slice) => ({
+    ...slice,
+    themes: slice.themes.map((t) =>
+      t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
+    ),
+    replies: slice.replies.map((r) => {
+      let next = r;
+      if (r.theme.id === themeId) {
+        next = { ...next, theme: { ...next.theme, replies_count: themeRepliesCount } };
+      }
+      if (parentId != null && r.id === parentId && parentRepliesCount !== undefined) {
+        next = { ...next, replies_count: parentRepliesCount };
+      }
+      return next;
+    }),
+  }));
+}
+
 export interface ProfileCounts {
   themes: number;
   replies: number;
@@ -181,15 +244,28 @@ export default function ProfileTabs({
   const [slices, setSlices] = useState<Record<ProfileTab, TabSlice>>(initial.slices);
   const [loadingTab, setLoadingTab] = useState<ProfileTab | null>(initial.loadingTab);
   const [error, setError] = useState("");
+  const [tabCounts, setTabCounts] = useState(counts);
   const slicesRef = useRef(slices);
   const syncedUsername = useRef(username);
   const panelsRef = useRef<HTMLDivElement>(null);
   const lockedScrollY = useRef<number | null>(null);
   const scrollLocked = useRef(false);
   const programmaticScroll = useRef(false);
+  const pendingThemeDeletes = useRef(new Set<number>());
+  const pendingReplyDeletes = useRef(new Map<number, ReplyDeletedDetail>());
   const [exitingRepostIds, setExitingRepostIds] = useState<Set<number>>(() => new Set());
+  const [exitingThemeIds, setExitingThemeIds] = useState<Set<number>>(() => new Set());
+  const [exitingReplyIds, setExitingReplyIds] = useState<Set<number>>(() => new Set());
+  const exitingThemeIdsRef = useRef(exitingThemeIds);
+  const exitingReplyIdsRef = useRef(exitingReplyIds);
 
   slicesRef.current = slices;
+  exitingThemeIdsRef.current = exitingThemeIds;
+  exitingReplyIdsRef.current = exitingReplyIds;
+
+  useEffect(() => {
+    setTabCounts(counts);
+  }, [username, counts]);
 
   const removeRepostFromSlice = useCallback((themeId: number) => {
     setSlices((prev) =>
@@ -214,6 +290,100 @@ export default function ProfileTabs({
       return next;
     });
   }, []);
+
+  const removeThemeFromSlice = useCallback((themeId: number) => {
+    setSlices((prev) =>
+      mapSlices(prev, (slice) => ({
+        ...slice,
+        themes: slice.themes.filter((t) => t.id !== themeId),
+        replies: slice.replies.filter((r) => r.theme.id !== themeId),
+      })),
+    );
+    setExitingThemeIds((prev) => {
+      if (!prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.delete(themeId);
+      return next;
+    });
+  }, []);
+
+  const scheduleThemeRemove = useCallback((themeId: number) => {
+    setExitingThemeIds((prev) => {
+      if (prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.add(themeId);
+      return next;
+    });
+  }, []);
+
+  const cancelThemeRemove = useCallback((themeId: number) => {
+    pendingThemeDeletes.current.delete(themeId);
+    setExitingThemeIds((prev) => {
+      if (!prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.delete(themeId);
+      return next;
+    });
+  }, []);
+
+  const finishThemeRemove = useCallback(
+    (themeId: number) => {
+      if (pendingThemeDeletes.current.has(themeId)) {
+        pendingThemeDeletes.current.delete(themeId);
+        emitThemeDeleted({ themeId });
+      }
+      removeThemeFromSlice(themeId);
+      setTabCounts((c) => ({ ...c, themes: Math.max(0, c.themes - 1) }));
+    },
+    [removeThemeFromSlice],
+  );
+
+  const removeReplyFromSlice = useCallback((replyId: number) => {
+    setSlices((prev) =>
+      mapSlices(prev, (slice) => ({
+        ...slice,
+        replies: slice.replies.filter((r) => r.id !== replyId),
+      })),
+    );
+    setExitingReplyIds((prev) => {
+      if (!prev.has(replyId)) return prev;
+      const next = new Set(prev);
+      next.delete(replyId);
+      return next;
+    });
+  }, []);
+
+  const scheduleReplyRemove = useCallback((replyId: number) => {
+    setExitingReplyIds((prev) => {
+      if (prev.has(replyId)) return prev;
+      const next = new Set(prev);
+      next.add(replyId);
+      return next;
+    });
+  }, []);
+
+  const cancelReplyRemove = useCallback((replyId: number) => {
+    pendingReplyDeletes.current.delete(replyId);
+    setExitingReplyIds((prev) => {
+      if (!prev.has(replyId)) return prev;
+      const next = new Set(prev);
+      next.delete(replyId);
+      return next;
+    });
+  }, []);
+
+  const finishReplyRemove = useCallback(
+    (replyId: number) => {
+      const detail = pendingReplyDeletes.current.get(replyId);
+      if (detail) {
+        pendingReplyDeletes.current.delete(replyId);
+        emitReplyDeleted(detail);
+      }
+      removeReplyFromSlice(replyId);
+      setTabCounts((c) => ({ ...c, replies: Math.max(0, c.replies - 1) }));
+    },
+    [removeReplyFromSlice],
+  );
 
   const scheduleRepostRemove = useCallback(
     (themeId: number) => {
@@ -245,24 +415,12 @@ export default function ProfileTabs({
     [username],
   );
 
-  const removeThemeFromSlices = useCallback((themeId: number) => {
-    setSlices((prev) =>
-      mapSlices(prev, (slice) => ({
-        ...slice,
-        themes: slice.themes.filter((t) => t.id !== themeId),
-        replies: slice.replies.filter((r) => r.theme.id !== themeId),
-      })),
-    );
-  }, []);
-
-  const removeReplyFromSlices = useCallback((replyId: number) => {
-    setSlices((prev) =>
-      mapSlices(prev, (slice) => ({
-        ...slice,
-        replies: slice.replies.filter((r) => r.id !== replyId),
-      })),
-    );
-  }, []);
+  const removeThemeFromSlices = useCallback(
+    (themeId: number) => {
+      removeThemeFromSlice(themeId);
+    },
+    [removeThemeFromSlice],
+  );
 
   const handleRepostChange = useCallback(
     (
@@ -402,6 +560,10 @@ export default function ProfileTabs({
       setSlices(cached.slices);
       setLoadingTab(cached.slices[cached.tab].loaded ? null : cached.tab);
       setExitingRepostIds(new Set());
+      setExitingThemeIds(new Set());
+      setExitingReplyIds(new Set());
+      pendingThemeDeletes.current.clear();
+      pendingReplyDeletes.current.clear();
       setError("");
       return;
     }
@@ -409,6 +571,10 @@ export default function ProfileTabs({
     setSlices(emptySlices());
     setLoadingTab("themes");
     setExitingRepostIds(new Set());
+    setExitingThemeIds(new Set());
+    setExitingReplyIds(new Set());
+    pendingThemeDeletes.current.clear();
+    pendingReplyDeletes.current.clear();
     setError("");
     window.scrollTo(0, 0);
   }, [username, unlockScroll]);
@@ -550,28 +716,42 @@ export default function ProfileTabs({
         return next;
       });
     };
+    const onThemeCreated = (e: Event) => {
+      const theme = (e as CustomEvent<Theme>).detail;
+      if (username !== getStoredUsername() || theme.author.username !== username) return;
+      setSlices((prev) => prependThemeToSlice(prev, theme));
+      setTabCounts((c) => ({ ...c, themes: c.themes + 1 }));
+    };
     const onReplyCreated = (e: Event) => {
-      const { themeId, parentId, themeRepliesCount, parentRepliesCount } = (
-        e as CustomEvent<ReplyCreatedDetail>
-      ).detail;
-      setSlices((prev) =>
-        mapSlices(prev, (slice) => ({
-          ...slice,
-          themes: slice.themes.map((t) =>
-            t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
-          ),
-          replies: slice.replies.map((r) => {
-            let next = r;
-            if (r.theme.id === themeId) {
-              next = { ...next, theme: { ...next.theme, replies_count: themeRepliesCount } };
-            }
-            if (parentId != null && r.id === parentId && parentRepliesCount !== undefined) {
-              next = { ...next, replies_count: parentRepliesCount };
-            }
-            return next;
-          }),
-        })),
-      );
+      const detail = (e as CustomEvent<ReplyCreatedDetail>).detail;
+      const { themeId, parentId, themeRepliesCount, parentRepliesCount, reply } = detail;
+      setSlices((prev) => {
+        let next = patchReplyCountsInSlices(
+          prev,
+          themeId,
+          parentId,
+          themeRepliesCount,
+          parentRepliesCount,
+        );
+        if (username !== getStoredUsername() || reply.author.username !== username) {
+          return next;
+        }
+        const profileReply =
+          buildProfileReplyFromCreated(detail) ??
+          (() => {
+            const theme = findThemeInSlices(next, themeId) ?? findThemeInAllCaches(themeId);
+            if (!theme) return null;
+            return {
+              ...reply,
+              theme: { ...theme, replies_count: themeRepliesCount },
+            } satisfies ProfileReply;
+          })();
+        if (!profileReply) return next;
+        return prependReplyToSlice(next, profileReply);
+      });
+      if (username === getStoredUsername() && reply.author.username === username) {
+        setTabCounts((c) => ({ ...c, replies: c.replies + 1 }));
+      }
     };
     const onReplyLike = (e: Event) => {
       const { replyId, liked, likes_count } = (e as CustomEvent<ReplyLikeDetail>).detail;
@@ -597,36 +777,54 @@ export default function ProfileTabs({
     };
     const onThemeDeleted = (e: Event) => {
       const { themeId } = (e as CustomEvent<ThemeDeletedDetail>).detail;
-      setSlices((prev) =>
-        mapSlices(prev, (slice, tabId) => ({
-          ...slice,
-          themes: slice.themes.filter((t) => t.id !== themeId),
-          replies: slice.replies.filter((r) => r.theme.id !== themeId),
-        })),
-      );
+      const inThemes = slicesRef.current.themes.themes.some((t) => t.id === themeId);
+      if (inThemes) {
+        if (!exitingThemeIdsRef.current.has(themeId)) {
+          scheduleThemeRemove(themeId);
+        }
+        return;
+      }
+      removeThemeFromSlice(themeId);
+      setTabCounts((c) => ({ ...c, themes: Math.max(0, c.themes - 1) }));
     };
     const onReplyDeleted = (e: Event) => {
       const { replyId, themeId, themeRepliesCount, parentRepliesCount } = (
         e as CustomEvent<ReplyDeletedDetail>
       ).detail;
+      const inReplies = slicesRef.current.replies.replies.some((r) => r.id === replyId);
       setSlices((prev) =>
         mapSlices(prev, (slice) => ({
           ...slice,
           themes: slice.themes.map((t) =>
             t.id === themeId ? { ...t, replies_count: themeRepliesCount } : t,
           ),
-          replies: slice.replies
-            .filter((r) => r.id !== replyId)
-            .map((r) => {
-              if (r.theme.id === themeId) {
-                return { ...r, theme: { ...r.theme, replies_count: themeRepliesCount } };
-              }
-              return r;
-            }),
+          replies: inReplies
+            ? slice.replies.map((r) => {
+                if (r.theme.id === themeId) {
+                  return { ...r, theme: { ...r.theme, replies_count: themeRepliesCount } };
+                }
+                return r;
+              })
+            : slice.replies
+                .filter((r) => r.id !== replyId)
+                .map((r) => {
+                  if (r.theme.id === themeId) {
+                    return { ...r, theme: { ...r.theme, replies_count: themeRepliesCount } };
+                  }
+                  return r;
+                }),
         })),
       );
+      if (inReplies) {
+        if (!exitingReplyIdsRef.current.has(replyId)) {
+          scheduleReplyRemove(replyId);
+        }
+        return;
+      }
+      setTabCounts((c) => ({ ...c, replies: Math.max(0, c.replies - 1) }));
     };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+    window.addEventListener(THEME_CREATED_EVENT, onThemeCreated);
     window.addEventListener(THEME_LIKE_EVENT, onThemeLike);
     window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
     window.addEventListener(REPLY_CREATED_EVENT, onReplyCreated);
@@ -636,6 +834,7 @@ export default function ProfileTabs({
     window.addEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     return () => {
       window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+      window.removeEventListener(THEME_CREATED_EVENT, onThemeCreated);
       window.removeEventListener(THEME_LIKE_EVENT, onThemeLike);
       window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
       window.removeEventListener(REPLY_CREATED_EVENT, onReplyCreated);
@@ -644,7 +843,13 @@ export default function ProfileTabs({
       window.removeEventListener(THEME_DELETED_EVENT, onThemeDeleted);
       window.removeEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
     };
-  }, [scheduleRepostRemove, username]);
+  }, [
+    removeThemeFromSlice,
+    scheduleReplyRemove,
+    scheduleRepostRemove,
+    scheduleThemeRemove,
+    username,
+  ]);
 
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
@@ -668,10 +873,10 @@ export default function ProfileTabs({
   });
 
   const TAB_DEFS: { id: ProfileTab; label: string; count: number }[] = [
-    { id: "themes", label: "Themes", count: counts.themes },
-    { id: "replies", label: "Replies", count: counts.replies },
-    { id: "media", label: "Media", count: counts.media },
-    { id: "reposts", label: "Reposts", count: counts.reposts },
+    { id: "themes", label: "Themes", count: tabCounts.themes },
+    { id: "replies", label: "Replies", count: tabCounts.replies },
+    { id: "media", label: "Media", count: tabCounts.media },
+    { id: "reposts", label: "Reposts", count: tabCounts.reposts },
   ];
 
   const isOwnProfile = getStoredUsername() === username;
@@ -724,22 +929,33 @@ export default function ProfileTabs({
               <div className="feed-list">
                 {tabId === "replies"
                   ? slice.replies.map((r) => (
-                      <div key={`r-${r.id}`} className="profile-reply-thread">
-                        <div className="thread-chain">
-                          <ThemeCard
-                            theme={r.theme}
-                            threadLineBelow
-                            {...themeRepostProps}
-                            onDeleted={() => removeThemeFromSlices(r.theme.id)}
-                          />
-                          <ReplyCard
-                            reply={r}
-                            indented
-                            clickable
-                            onDeleted={() => removeReplyFromSlices(r.id)}
-                          />
+                      <ListExitWrap
+                        key={`r-${r.id}`}
+                        exiting={exitingReplyIds.has(r.id)}
+                        onExitComplete={() => finishReplyRemove(r.id)}
+                      >
+                        <div className="profile-reply-thread">
+                          <div className="thread-chain">
+                            <ThemeCard
+                              theme={r.theme}
+                              threadLineBelow
+                              {...themeRepostProps}
+                              onDeleted={() => removeThemeFromSlices(r.theme.id)}
+                            />
+                            <ReplyCard
+                              reply={r}
+                              indented
+                              clickable
+                              listExitViaParent={isOwnProfile}
+                              onDeleteExitStart={(detail) => {
+                                pendingReplyDeletes.current.set(r.id, detail);
+                                scheduleReplyRemove(r.id);
+                              }}
+                              onDeleteExitFailed={() => cancelReplyRemove(r.id)}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      </ListExitWrap>
                     ))
                   : tabId === "reposts"
                     ? slice.themes.map((t) => (
@@ -755,14 +971,33 @@ export default function ProfileTabs({
                           />
                         </ListExitWrap>
                       ))
-                    : slice.themes.map((t) => (
-                        <ThemeCard
-                          key={`${tabId}-${t.id}`}
-                          theme={t}
-                          {...themeRepostProps}
-                          onDeleted={() => removeThemeFromSlices(t.id)}
-                        />
-                      ))}
+                    : tabId === "themes"
+                      ? slice.themes.map((t) => (
+                          <ListExitWrap
+                            key={`${tabId}-${t.id}`}
+                            exiting={exitingThemeIds.has(t.id)}
+                            onExitComplete={() => finishThemeRemove(t.id)}
+                          >
+                            <ThemeCard
+                              theme={t}
+                              listExitViaParent={isOwnProfile}
+                              onDeleteExitStart={() => {
+                                pendingThemeDeletes.current.add(t.id);
+                                scheduleThemeRemove(t.id);
+                              }}
+                              onDeleteExitFailed={() => cancelThemeRemove(t.id)}
+                              {...themeRepostProps}
+                            />
+                          </ListExitWrap>
+                        ))
+                      : slice.themes.map((t) => (
+                          <ThemeCard
+                            key={`${tabId}-${t.id}`}
+                            theme={t}
+                            {...themeRepostProps}
+                            onDeleted={() => removeThemeFromSlices(t.id)}
+                          />
+                        ))}
               </div>
 
               {isActive && isLoading && items.length === 0 && (

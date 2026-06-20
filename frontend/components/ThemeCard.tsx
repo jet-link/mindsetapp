@@ -33,6 +33,9 @@ export default function ThemeCard({
   threadLineBelow = false,
   onRepostChange,
   onDeleted,
+  listExitViaParent = false,
+  onDeleteExitStart,
+  onDeleteExitFailed,
 }: {
   theme: Theme;
   clickable?: boolean;
@@ -43,6 +46,9 @@ export default function ThemeCard({
     options?: { theme?: Theme; immediate?: boolean },
   ) => void;
   onDeleted?: () => void;
+  listExitViaParent?: boolean;
+  onDeleteExitStart?: () => void;
+  onDeleteExitFailed?: () => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
@@ -160,30 +166,37 @@ export default function ThemeCard({
     }
   }
 
-  function onReply() {
+  function openThread() {
+    saveReturnAnchor({ kind: "theme", id: theme.id });
     seedThreadTheme(theme);
     router.push(`/thread/${theme.id}`);
+  }
+
+  function onReply() {
+    openThread();
   }
 
   function onBodyClick(e: MouseEvent<HTMLDivElement>) {
     if (!clickable) return;
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
-    saveReturnAnchor({ kind: "theme", id: theme.id });
-    seedThreadTheme(theme);
-    router.push(`/thread/${theme.id}`);
+    openThread();
   }
 
   return (
     <ListExitWrap
-      exiting={exiting}
-      onExitComplete={() => {
-        if (deletePending.current) {
-          emitThemeDeleted({ themeId: theme.id });
-          deletePending.current = false;
-        }
-        onDeleted?.();
-      }}
+      exiting={listExitViaParent ? false : exiting}
+      onExitComplete={
+        listExitViaParent
+          ? undefined
+          : () => {
+              if (deletePending.current) {
+                emitThemeDeleted({ themeId: theme.id });
+                deletePending.current = false;
+              }
+              onDeleted?.();
+            }
+      }
     >
       <article className="card" data-anchor-theme={theme.id}>
       <div
@@ -210,11 +223,23 @@ export default function ThemeCard({
             itemId={theme.id}
             createdAt={theme.created_at}
             isDeletable={theme.is_deletable}
-            onDeleteStart={() => setExiting(true)}
+            onDeleteStart={() => {
+              if (!listExitViaParent) setExiting(true);
+            }}
             onDeleteSuccess={() => {
+              if (listExitViaParent) {
+                onDeleteExitStart?.();
+                return;
+              }
               deletePending.current = true;
             }}
-            onDeleteFailed={() => setExiting(false)}
+            onDeleteFailed={() => {
+              if (listExitViaParent) {
+                onDeleteExitFailed?.();
+                return;
+              }
+              setExiting(false);
+            }}
           />
         </div>
 

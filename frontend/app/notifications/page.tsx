@@ -7,11 +7,16 @@ import PageHeader from "@/components/PageHeader";
 import Avatar from "@/components/Avatar";
 import {
   NotificationItem,
+  REPLY_DELETED_EVENT,
+  ReplyDeletedDetail,
+  THEME_REPOST_EVENT,
+  ThemeRepostDetail,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
   clearNotifications,
   emitNotificationsChanged,
   getNotifications,
+  getStoredUsername,
   isLoggedIn,
   markAllNotificationsRead,
 } from "@/lib/api";
@@ -21,6 +26,13 @@ import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 function verbText(n: NotificationItem): string {
   if (n.verb === "repost") return "reposted your theme";
   return "replied to your theme";
+}
+
+function formatNotificationDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function targetHref(n: NotificationItem): string | null {
@@ -77,9 +89,37 @@ export default function NotificationsPage() {
       if (avatar === undefined) return;
       setItems((prev) => patchNotificationActors(prev, username, avatar));
     };
+    const onThemeRepost = (e: Event) => {
+      const { themeId, reposted } = (e as CustomEvent<ThemeRepostDetail>).detail;
+      if (reposted) return;
+      const actor = getStoredUsername();
+      if (!actor) return;
+      setItems((prev) =>
+        prev.filter(
+          (n) => !(n.verb === "repost" && n.theme_id === themeId && n.actor.username === actor),
+        ),
+      );
+      emitNotificationsChanged();
+    };
+    const onReplyDeleted = (e: Event) => {
+      const { replyId } = (e as CustomEvent<ReplyDeletedDetail>).detail;
+      setItems((prev) => prev.filter((n) => !(n.verb === "reply" && n.reply_id === replyId)));
+      emitNotificationsChanged();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") load();
+    };
     window.addEventListener(USER_PROFILE_EVENT, onProfileUpdated);
-    return () => window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
-  }, []);
+    window.addEventListener(THEME_REPOST_EVENT, onThemeRepost);
+    window.addEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener(USER_PROFILE_EVENT, onProfileUpdated);
+      window.removeEventListener(THEME_REPOST_EVENT, onThemeRepost);
+      window.removeEventListener(REPLY_DELETED_EVENT, onReplyDeleted);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [load]);
 
   async function onReadAll() {
     setBusy(true);
@@ -167,6 +207,9 @@ export default function NotificationsPage() {
                   </Link>{" "}
                   {verbText(n)}
                 </p>
+                <time className="notif-row__time" dateTime={n.created_at}>
+                  {formatNotificationDate(n.created_at)}
+                </time>
               </div>
               {href && (
                 <Link href={href} className="notif-row__action">

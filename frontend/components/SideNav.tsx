@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AUTH_EVENT,
   NOTIFICATION_EVENT,
@@ -11,6 +11,7 @@ import {
   getStoredUsername,
 } from "@/lib/api";
 import NavProfileLink from "@/components/NavProfileLink";
+import ExtrasMenu from "@/components/ExtrasMenu";
 import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/RouteTitle";
 import { bounceNavItem } from "@/lib/nav-bounce";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
@@ -59,17 +60,6 @@ export default function SideNav() {
 
   const profileHref = username ? `/u/${username}` : "/login";
   const profileActive = pathname === profileHref;
-  const [extrasOpen, setExtrasOpen] = useState(false);
-  const extrasRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!extrasOpen) return;
-    function onDocClick(e: MouseEvent) {
-      if (!extrasRef.current?.contains(e.target as Node)) setExtrasOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [extrasOpen]);
 
   return (
     <aside className="sidenav">
@@ -131,35 +121,7 @@ export default function SideNav() {
         />
       </nav>
 
-      <div className="sidenav__extras" ref={extrasRef}>
-        <button
-          type="button"
-          className="sidenav__bars"
-          aria-label="Menu"
-          aria-expanded={extrasOpen}
-          title="Menu"
-          onClick={() => setExtrasOpen((v) => !v)}
-        >
-          <span />
-          <span />
-        </button>
-        {extrasOpen && (
-          <div className="sidenav__extras-panel" role="menu">
-            <button type="button" className="sidenav__extras-item" role="menuitem">
-              <i className="fa fa-sun" aria-hidden="true" />
-              Theme
-            </button>
-            <button type="button" className="sidenav__extras-item" role="menuitem">
-              <i className="fa fa-language" aria-hidden="true" />
-              Language
-            </button>
-            <button type="button" className="sidenav__extras-item" role="menuitem">
-              <i className="fa fa-bullhorn" aria-hidden="true" />
-              Report a problem
-            </button>
-          </div>
-        )}
-      </div>
+      <ExtrasMenu />
     </aside>
   );
 }

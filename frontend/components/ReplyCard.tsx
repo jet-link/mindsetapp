@@ -34,6 +34,9 @@ export default function ReplyCard({
   clickable = false,
   threadLineBelow = false,
   onDeleted,
+  listExitViaParent = false,
+  onDeleteExitStart,
+  onDeleteExitFailed,
 }: {
   reply: Reply;
   showViewTheme?: boolean;
@@ -41,6 +44,9 @@ export default function ReplyCard({
   clickable?: boolean;
   threadLineBelow?: boolean;
   onDeleted?: () => void;
+  listExitViaParent?: boolean;
+  onDeleteExitStart?: (detail: ReplyDeletedDetail) => void;
+  onDeleteExitFailed?: () => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(reply.is_liked);
@@ -137,30 +143,37 @@ export default function ReplyCard({
     }
   }
 
-  function onReplies() {
+  function openReplyThread() {
+    saveReturnAnchor({ kind: "reply", id: reply.id });
     seedReplyDetailReply(reply);
     router.push(`/reply/${reply.id}`);
+  }
+
+  function onReplies() {
+    openReplyThread();
   }
 
   function onBodyClick(e: MouseEvent<HTMLDivElement>) {
     if (!clickable) return;
     const target = e.target as HTMLElement;
     if (target.closest("a, button")) return;
-    saveReturnAnchor({ kind: "reply", id: reply.id });
-    seedReplyDetailReply(reply);
-    router.push(`/reply/${reply.id}`);
+    openReplyThread();
   }
 
   return (
     <ListExitWrap
-      exiting={exiting}
-      onExitComplete={() => {
-        if (deletePending.current) {
-          emitReplyDeleted(deletePending.current);
-          deletePending.current = null;
-        }
-        onDeleted?.();
-      }}
+      exiting={listExitViaParent ? false : exiting}
+      onExitComplete={
+        listExitViaParent
+          ? undefined
+          : () => {
+              if (deletePending.current) {
+                emitReplyDeleted(deletePending.current);
+                deletePending.current = null;
+              }
+              onDeleted?.();
+            }
+      }
     >
       <article className={`card${indented ? " card--reply" : ""}`} data-anchor-reply={reply.id}>
       <div
@@ -189,11 +202,23 @@ export default function ReplyCard({
             isDeletable={reply.is_deletable}
             themeId={reply.theme_id}
             parentId={reply.parent_id}
-            onDeleteStart={() => setExiting(true)}
+            onDeleteStart={() => {
+              if (!listExitViaParent) setExiting(true);
+            }}
             onDeleteSuccess={(detail) => {
+              if (listExitViaParent) {
+                if (detail) onDeleteExitStart?.(detail);
+                return;
+              }
               if (detail) deletePending.current = detail;
             }}
-            onDeleteFailed={() => setExiting(false)}
+            onDeleteFailed={() => {
+              if (listExitViaParent) {
+                onDeleteExitFailed?.();
+                return;
+              }
+              setExiting(false);
+            }}
           />
         </div>
 

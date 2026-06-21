@@ -243,7 +243,7 @@ export default function ReplyCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onReplies}
           >
-            <i className="fa fa-comment-o" aria-hidden="true" />{" "}
+            <i className="fa fa-comment" aria-hidden="true" />{" "}
             {formatCount(replies)}
           </button>
           <button

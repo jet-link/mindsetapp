@@ -279,7 +279,7 @@ export default function ThemeCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onReply}
           >
-            <i className="fa fa-comment-o" aria-hidden="true" />{" "}
+            <i className="fa fa-comment" aria-hidden="true" />{" "}
             {formatCount(replies)}
           </button>
           <button

@@ -9,9 +9,11 @@ import {
   getMobileBackVisible,
   subscribeMobileBack,
 } from "@/lib/mobile-back";
+import { useMobileHeaderScroll } from "@/lib/use-mobile-header-scroll";
 
 export default function MobileHeader() {
   const [showBack, setShowBack] = useState(false);
+  const hidden = useMobileHeaderScroll();
 
   useEffect(() => {
     setShowBack(getMobileBackVisible());
@@ -19,7 +21,7 @@ export default function MobileHeader() {
   }, []);
 
   return (
-    <header className="mobile-header">
+    <header className={`mobile-header${hidden ? " mobile-header--hidden" : ""}`}>
       <div className="mobile-header__start">
         {showBack ? (
           <BackButton className="mobile-header__back" />

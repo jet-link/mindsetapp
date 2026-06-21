@@ -1208,7 +1208,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   bottom: calc(-1 * (2 * var(--thread-card-py) - var(--thread-gap)));
   width: 2.2px;
   margin-left: -0.5px;
-  background: var(--text-dim);
+  background: #000000;
   pointer-events: none;
   border-radius: 10px;
 }

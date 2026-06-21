@@ -17,6 +17,7 @@ import {
   updateThemeLikeInFeedCache,
   updateThemeRepostInFeedCache,
   removeAuthorFromFollowingFeedCache,
+  addAuthorThemesToFollowingFeedCache,
   removeThemeFromFeedCache,
   clearFeedCache,
 } from "./feed-cache";
@@ -24,6 +25,7 @@ import {
   buildProfileReplyFromCreated,
   clearProfileTabsCache,
   prependReplyToProfileCache,
+  prependRepostToProfileCache,
   prependThemeToProfileCache,
   updateThemeLikeInProfileCache,
   updateThemeRepostInProfileCache,
@@ -39,6 +41,7 @@ import {
   updateThemeRepostInTagCaches,
   removeThemeFromTagCaches,
 } from "./tag-cache";
+import { findThemeInAllCaches } from "./theme-cache-lookup";
 import { setUserAvatarOverride } from "./user-avatar-store";
 
 export interface UserPublic {
@@ -547,12 +550,28 @@ export interface FollowChangedDetail {
 }
 
 export function emitFollowChanged(detail: FollowChangedDetail) {
-  if (typeof window !== "undefined") {
-    if (detail.following === false) {
-      removeAuthorFromFollowingFeedCache(detail.profileUsername);
-    }
+  if (typeof window === "undefined") return;
+
+  if (detail.following === false) {
+    removeAuthorFromFollowingFeedCache(detail.profileUsername);
     window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
+    return;
   }
+
+  if (detail.following === true) {
+    void getUserThemes(detail.profileUsername)
+      .then((page) => {
+        if (page.results.length) {
+          addAuthorThemesToFollowingFeedCache(page.results);
+        }
+      })
+      .finally(() => {
+        window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
+      });
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
 }
 
 export const getFollowers = (username: string, cursor?: string, q?: string) =>
@@ -801,6 +820,16 @@ export function emitThemeRepostChanged(detail: ThemeRepostDetail) {
   updateThemeRepostInFeedCache(detail.themeId, detail.reposted, detail.reposts_count);
   updateThemeRepostInTagCaches(detail.themeId, detail.reposted, detail.reposts_count);
   updateThemeRepostInProfileCache(detail.themeId, detail.reposted, detail.reposts_count);
+  if (detail.reposted) {
+    const theme = findThemeInAllCaches(detail.themeId);
+    if (theme) {
+      prependRepostToProfileCache({
+        ...theme,
+        is_reposted: true,
+        reposts_count: detail.reposts_count,
+      });
+    }
+  }
   applyThemeRepostChanged(detail.themeId, detail.reposted, detail.reposts_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(THEME_REPOST_EVENT, { detail }));

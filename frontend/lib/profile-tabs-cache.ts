@@ -214,3 +214,65 @@ export function prependReplyToProfileCache(profileReply: ProfileReply) {
     };
   });
 }
+
+function emptyProfileSlices(): Record<ProfileTab, ProfileSlice> {
+  return {
+    themes: { themes: [], replies: [], nextCursor: null, loaded: false },
+    replies: { themes: [], replies: [], nextCursor: null, loaded: false },
+    media: { themes: [], replies: [], nextCursor: null, loaded: false },
+    reposts: { themes: [], replies: [], nextCursor: null, loaded: false },
+  };
+}
+
+/** Репост с ленты/треда: темы ещё нет во вкладках профиля — добавляем в Reposts. */
+export function prependRepostToProfileCache(theme: Theme) {
+  const username = getStoredUsername();
+  if (!username) return;
+
+  const repostedTheme = { ...theme, is_reposted: true };
+
+  if (!profileTabsCache || profileTabsCache.username !== username) {
+    const slices = emptyProfileSlices();
+    slices.reposts = {
+      themes: [repostedTheme],
+      replies: [],
+      nextCursor: null,
+      loaded: true,
+    };
+    profileTabsCache = {
+      username,
+      tab: profileTabsCache?.username === username ? profileTabsCache.tab : "themes",
+      slices,
+    };
+    return;
+  }
+
+  mapCachedSlices((slice, tab) => {
+    if (tab !== "reposts") {
+      return {
+        ...slice,
+        themes: slice.themes.map((t) =>
+          t.id === theme.id
+            ? { ...t, is_reposted: true, reposts_count: repostedTheme.reposts_count }
+            : t,
+        ),
+        replies: slice.replies.map((r) =>
+          r.theme.id === theme.id
+            ? {
+                ...r,
+                theme: {
+                  ...r.theme,
+                  is_reposted: true,
+                  reposts_count: repostedTheme.reposts_count,
+                },
+              }
+            : r,
+        ),
+      };
+    }
+    const themes = slice.themes.some((t) => t.id === theme.id)
+      ? slice.themes.map((t) => (t.id === theme.id ? { ...t, ...repostedTheme } : t))
+      : [repostedTheme, ...slice.themes];
+    return { ...slice, themes, loaded: true };
+  });
+}

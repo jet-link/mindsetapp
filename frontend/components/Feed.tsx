@@ -308,6 +308,19 @@ export default function Feed() {
   useEffect(() => {
     const onFollow = (e: Event) => {
       const { profileUsername, following } = (e as CustomEvent<FollowChangedDetail>).detail;
+      if (following === true) {
+        const cache = getFeedCache("following");
+        if (!cache?.themes.length) return;
+        setSlices((prev) => ({
+          ...prev,
+          following: {
+            themes: cache.themes,
+            nextCursor: prev.following.nextCursor ?? cache.nextCursor,
+            loaded: true,
+          },
+        }));
+        return;
+      }
       if (following !== false) return;
       removeAuthorFromFollowingFeedCache(profileUsername);
       setSlices((prev) => ({

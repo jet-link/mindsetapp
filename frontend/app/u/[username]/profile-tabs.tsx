@@ -268,12 +268,16 @@ export default function ProfileTabs({
   }, [username, counts]);
 
   const removeRepostFromSlice = useCallback((themeId: number) => {
+    const hadRepost = slicesRef.current.reposts.themes.some((t) => t.id === themeId);
     setSlices((prev) =>
       mapSlices(prev, (slice, tabId) => {
         if (tabId !== "reposts") return slice;
         return { ...slice, themes: slice.themes.filter((t) => t.id !== themeId) };
       }),
     );
+    if (hadRepost) {
+      setTabCounts((c) => ({ ...c, reposts: Math.max(0, c.reposts - 1) }));
+    }
     setExitingRepostIds((prev) => {
       if (!prev.has(themeId)) return prev;
       const next = new Set(prev);
@@ -701,10 +705,15 @@ export default function ProfileTabs({
       if (!reposted && isOwnProfile) {
         scheduleRepostRemove(themeId);
       }
+      const hadRepost =
+        reposted &&
+        isOwnProfile &&
+        slicesRef.current.reposts.themes.some((t) => t.id === themeId);
       setSlices((prev) => {
         let next = patchThemeRepostFlags(prev, themeId, reposted, reposts_count);
         if (reposted && isOwnProfile) {
-          const source = findThemeInSlices(next, themeId);
+          const source =
+            findThemeInSlices(next, themeId) ?? findThemeInAllCaches(themeId);
           if (source) {
             next = prependToRepostsSlice(next, {
               ...source,
@@ -715,6 +724,14 @@ export default function ProfileTabs({
         }
         return next;
       });
+      if (reposted && isOwnProfile && !hadRepost) {
+        const source =
+          findThemeInSlices(slicesRef.current, themeId) ??
+          findThemeInAllCaches(themeId);
+        if (source) {
+          setTabCounts((c) => ({ ...c, reposts: c.reposts + 1 }));
+        }
+      }
     };
     const onThemeCreated = (e: Event) => {
       const theme = (e as CustomEvent<Theme>).detail;

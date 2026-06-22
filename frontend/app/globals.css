@@ -1787,7 +1787,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .surface-form-card textarea {
   display: block;
   width: 100%;
-  min-height: 180px;
+  min-height: 200px;
   padding: 16px 18px;
   border: none;
   background: transparent;
@@ -1814,6 +1814,100 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   gap: 12px;
   padding: 10px 14px 12px;
   border-top: 1px solid var(--border);
+}
+.surface-form-card__footer--end {
+  justify-content: flex-end;
+}
+.surface-form-card__footer--end:has(.bio-counter) {
+  justify-content: space-between;
+}
+
+/* Report theme / reply form */
+.surface-form-card--report {
+  max-width: 560px;
+}
+.report-reasons {
+  all: unset;
+  display: block;
+  border-bottom: 1px solid var(--border);
+}
+.report-reasons__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px 20px;
+  padding: 16px 18px 14px;
+}
+.report-radio {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+  /* font-weight: 600; */
+  color: var(--text);
+}
+.report-radio input {
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.report-radio__control {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid #c8c8cc;
+  background: var(--bg);
+  box-sizing: border-box;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+.report-radio input:checked + .report-radio__control {
+  border-color: var(--text);
+}
+.report-radio input:checked + .report-radio__control::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--text);
+}
+.report-radio input:focus-visible + .report-radio__control {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.report-radio:hover .report-radio__control {
+  border-color: var(--text-dim);
+}
+.surface-form-card__other {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  padding: 12px 18px 14px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  box-sizing: border-box;
+  resize: none;
+}
+.surface-form-card__other:focus {
+  outline: none;
+}
+.surface-form-card__other::placeholder {
+  color: var(--text-dim);
 }
 
 /* Hover-карточка @mention (Threads-style) */

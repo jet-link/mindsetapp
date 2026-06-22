@@ -10,6 +10,7 @@ import {
   isLoggedIn,
 } from "@/lib/api";
 import { isWithinDeleteWindow } from "@/lib/deletable";
+import ReportContentModal from "@/components/ReportContentModal";
 
 type Kind = "theme" | "reply";
 
@@ -37,6 +38,7 @@ export default function CardMenu({
   onDeleteFailed?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [isOwn, setIsOwn] = useState(false);
@@ -136,7 +138,10 @@ export default function CardMenu({
               type="button"
               className="card-menu__item"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                setReportOpen(true);
+              }}
             >
               Report
             </button>
@@ -149,6 +154,12 @@ export default function CardMenu({
           <div className="copy-overlay__box">{copiedLabel}</div>
         </div>
       )}
+
+      <ReportContentModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        kind={kind}
+      />
     </div>
   );
 }

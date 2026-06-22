@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import ReportProblemModal from "@/components/ReportProblemModal";
 
 type ExtrasPanelView = "menu" | "theme" | "language";
 type ThemeMode = "sun" | "night" | "auto";
@@ -38,6 +39,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
   const [panelView, setPanelView] = useState<ExtrasPanelView>("menu");
   const [themeMode, setThemeMode] = useState<ThemeMode>("sun");
   const [languageMode, setLanguageMode] = useState<LanguageMode>("eng");
+  const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,7 +93,15 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 Language
                 <i className="fa fa-chevron-right" aria-hidden="true" />
               </button>
-              <button type="button" className="sidenav__extras-item" role="menuitem">
+              <button
+                type="button"
+                className="sidenav__extras-item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  setReportOpen(true);
+                }}
+              >
                 Report a problem
               </button>
             </>
@@ -163,6 +173,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
           )}
         </div>
       )}
+      <ReportProblemModal open={reportOpen} onClose={() => setReportOpen(false)} />
     </div>
   );
 }

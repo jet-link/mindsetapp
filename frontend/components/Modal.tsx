@@ -8,12 +8,14 @@ export default function Modal({
   children,
   footer,
   ariaLabel,
+  overlayVariant = "default",
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   ariaLabel: string;
+  overlayVariant?: "default" | "lightbox";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -37,7 +39,9 @@ export default function Modal({
 
   return (
     <div
-      className="modal-overlay"
+      className={`modal-overlay${
+        overlayVariant === "lightbox" ? " modal-overlay--lightbox" : ""
+      }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

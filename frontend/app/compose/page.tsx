@@ -13,6 +13,7 @@ const RECENT_THEMES_LIMIT = 10;
 export default function ComposePage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [recent, setRecent] = useState<Theme[]>([]);
 
   useEffect(() => {
@@ -26,7 +27,10 @@ export default function ComposePage() {
     if (username) {
       getUserThemes(username)
         .then((p) => setRecent(p.results.slice(0, RECENT_THEMES_LIMIT)))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setLoaded(true));
+    } else {
+      setLoaded(true);
     }
   }, [router]);
 
@@ -52,9 +56,13 @@ export default function ComposePage() {
       <PageHeader title="New theme" showBack={false} />
       <Composer onPosted={onPosted} />
 
+      {loaded && recent.length === 0 && (
+        <p className="section-title muted">You haven&apos;t published any theme yet</p>
+      )}
+
       {recent.length > 0 && (
         <>
-          <h2 className="section-title">Your recent themes</h2>
+          <h2 className="section-title">Your last themes</h2>
           {recent.map((t) => (
             <ThemeCard key={t.id} theme={t} />
           ))}

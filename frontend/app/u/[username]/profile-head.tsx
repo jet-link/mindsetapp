@@ -209,7 +209,13 @@ export default function ProfileHead({
         )}
       </div>
 
-      <Modal open={bioOpen} onClose={closeBioModal} ariaLabel="Edit bio" footer={bioFooter}>
+      <Modal
+        open={bioOpen}
+        onClose={closeBioModal}
+        ariaLabel="Edit bio"
+        footer={bioFooter}
+        overlayVariant="lightbox"
+      >
         <h2 className="modal__title">{bio ? "Edit bio" : "Add bio"}</h2>
         <textarea
           value={bioDraft}

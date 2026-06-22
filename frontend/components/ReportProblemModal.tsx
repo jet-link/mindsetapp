@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function ReportProblemModal({
   open,
@@ -10,6 +11,11 @@ export default function ReportProblemModal({
   onClose: () => void;
 }) {
   const [body, setBody] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -24,7 +30,7 @@ export default function ReportProblemModal({
     if (!open) setBody("");
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,29 +38,29 @@ export default function ReportProblemModal({
     onClose();
   }
 
-  return (
+  return createPortal(
     <div
-      className="report-problem-lightbox"
+      className="surface-form-lightbox"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <button
         type="button"
-        className="close-btn report-problem-lightbox__close"
+        className="close-btn surface-form-lightbox__close"
         onClick={onClose}
         aria-label="Close"
       >
         <i className="fa fa-times" aria-hidden="true" />
       </button>
       <div
-        className="report-problem-lightbox__stage"
+        className="surface-form-lightbox__stage"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <h2 className="report-problem-lightbox__title">Report a problem</h2>
-        <form className="report-problem-form" onSubmit={submit} noValidate>
+        <h2 className="surface-form-lightbox__title">Report a problem</h2>
+        <form className="surface-form-card" onSubmit={submit} noValidate>
           <label className="sr-only" htmlFor="report-problem-body">
             Problem description
           </label>
@@ -65,7 +71,7 @@ export default function ReportProblemModal({
             placeholder="Provide as much detail as possible…"
             rows={6}
           />
-          <div className="report-problem-form__footer">
+          <div className="surface-form-card__footer">
             <button
               type="button"
               className="icon-btn"
@@ -81,6 +87,7 @@ export default function ReportProblemModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

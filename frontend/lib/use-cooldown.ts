@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  type CooldownScope,
+  getCooldownRemaining,
+  setCooldown,
+} from "@/lib/cooldown-storage";
 
 const COOLDOWN_RE = /try again in (\d+)/i;
 
-/** Достаёт число секунд кулдауна из текста ошибки сервера (429), иначе null. */
+/** Достаёт число секунд кулдауна из текста ошибки сервера, иначе null. */
 export function parseCooldownSeconds(message: string): number | null {
   const m = COOLDOWN_RE.exec(message);
   if (!m) return null;
@@ -10,22 +15,28 @@ export function parseCooldownSeconds(message: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Обратный отсчёт кулдауна: блокируем кнопку и показываем сколько осталось. */
-export function useCooldown() {
+/** Обратный отсчёт кулдауна с сохранением в sessionStorage (переживает уход со страницы). */
+export function useCooldown(scope: CooldownScope) {
   const [seconds, setSeconds] = useState(0);
-  const active = seconds > 0;
 
   useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => {
-      setSeconds((s) => (s <= 1 ? 0 : s - 1));
-    }, 1000);
+    const tick = () => setSeconds(getCooldownRemaining(scope));
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [active]);
+  }, [scope]);
+
+  const start = useCallback(
+    (s: number) => {
+      setCooldown(scope, s);
+      setSeconds(getCooldownRemaining(scope));
+    },
+    [scope],
+  );
 
   return {
     seconds,
-    active,
-    start: (s: number) => setSeconds(s),
+    active: seconds > 0,
+    start,
   };
 }

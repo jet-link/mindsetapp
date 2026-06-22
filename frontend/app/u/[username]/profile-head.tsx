@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import BioText, { bioCharCount } from "@/components/BioText";
-import Modal from "@/components/Modal";
 import Avatar from "@/components/Avatar";
 import ProfileStats from "./profile-stats";
 import {
@@ -49,6 +48,15 @@ export default function ProfileHead({
   }, [initialBio, initialAvatar, username]);
 
   useEffect(() => {
+    if (!bioOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [bioOpen]);
+
+  useEffect(() => {
     if (!avatarViewOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -68,7 +76,8 @@ export default function ProfileHead({
     setBioError("");
   }
 
-  async function saveBio() {
+  async function saveBio(e?: React.FormEvent) {
+    e?.preventDefault();
     if (bioCharCount(bioDraft) > BIO_LIMIT) {
       setBioError(`Bio must be ${BIO_LIMIT} characters or fewer (line breaks do not count).`);
       return;
@@ -131,18 +140,9 @@ export default function ProfileHead({
     fileRef.current?.click();
   }
 
-  const bioFooter = (
-    <div className="modal__actions">
-      <button type="button" className="btn btn--ghost" onClick={closeBioModal} disabled={bioBusy}>
-        Cancel
-      </button>
-      <button type="button" className="btn" onClick={saveBio} disabled={bioBusy}>
-        Save
-      </button>
-    </div>
-  );
-
   const canInteract = avatarUrl || isOwn;
+  const bioTitle = bio ? "Edit bio" : "Add bio";
+  const bioOverLimit = bioCharCount(bioDraft) > BIO_LIMIT;
 
   return (
     <>
@@ -209,32 +209,61 @@ export default function ProfileHead({
         )}
       </div>
 
-      <Modal
-        open={bioOpen}
-        onClose={closeBioModal}
-        ariaLabel="Edit bio"
-        footer={bioFooter}
-        overlayVariant="lightbox"
-      >
-        <h2 className="modal__title">{bio ? "Edit bio" : "Add bio"}</h2>
-        <textarea
-          value={bioDraft}
-          onChange={(e) => setBioDraft(e.target.value)}
-          placeholder="Tell people about yourself…"
-          aria-label="Bio"
-          rows={5}
-        />
-        <div className="modal__meta">
-          <span className={bioCharCount(bioDraft) > BIO_LIMIT ? "bio-counter bio-counter--over" : "bio-counter"}>
-            {bioCharCount(bioDraft)}/{BIO_LIMIT}
-          </span>
+      {bioOpen && (
+        <div
+          className="surface-form-lightbox"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeBioModal();
+          }}
+        >
+          <button
+            type="button"
+            className="close-btn surface-form-lightbox__close"
+            onClick={closeBioModal}
+            aria-label="Close"
+          >
+            <i className="fa fa-times" aria-hidden="true" />
+          </button>
+          <div
+            className="surface-form-lightbox__stage"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeBioModal();
+            }}
+          >
+            <h2 className="surface-form-lightbox__title">{bioTitle}</h2>
+            <form className="surface-form-card" onSubmit={saveBio} noValidate>
+              <label className="sr-only" htmlFor="profile-bio-draft">
+                Bio
+              </label>
+              <textarea
+                id="profile-bio-draft"
+                value={bioDraft}
+                onChange={(e) => setBioDraft(e.target.value)}
+                placeholder="Tell people about yourself…"
+                aria-label="Bio"
+                rows={6}
+              />
+              {bioError && (
+                <p className="error surface-form-card__error" role="alert">
+                  {bioError}
+                </p>
+              )}
+              <div className="surface-form-card__footer">
+                <span
+                  className={
+                    bioOverLimit ? "bio-counter bio-counter--over" : "bio-counter"
+                  }
+                >
+                  {bioCharCount(bioDraft)}/{BIO_LIMIT}
+                </span>
+                <button type="submit" className="btn" disabled={bioBusy || bioOverLimit}>
+                  {bio ? "Edit" : "Add"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        {bioError && (
-          <p className="error" role="alert">
-            {bioError}
-          </p>
-        )}
-      </Modal>
+      )}
 
       {avatarViewOpen && avatarUrl && (
         <div

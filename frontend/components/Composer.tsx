@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import { Theme, createTheme, emitThemeCreated, isLoggedIn } from "@/lib/api";
+import { THEME_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
 import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
 import {
   THEME_BODY_LIMIT,
@@ -16,7 +17,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const cooldown = useCooldown();
+  const cooldown = useCooldown("theme");
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -52,6 +53,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
     try {
       const theme = await createTheme(normalized);
       setBody("");
+      cooldown.start(THEME_COOLDOWN_SECONDS);
       emitThemeCreated(theme);
       onPosted?.(theme);
     } catch (err) {

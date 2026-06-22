@@ -1,11 +1,55 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import ReportProblemModal from "@/components/ReportProblemModal";
 
 type ExtrasPanelView = "menu" | "theme" | "language";
 type ThemeMode = "sun" | "night" | "auto";
 type LanguageMode = "eng" | "rus";
+
+function SegmentToggle<T extends string>({
+  options,
+  value,
+  onChange,
+  twoColumns,
+  ariaLabel,
+}: {
+  options: { value: T; label: ReactNode; text?: boolean }[];
+  value: T;
+  onChange: (value: T) => void;
+  twoColumns?: boolean;
+  ariaLabel: string;
+}) {
+  const activeIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value)
+  );
+
+  return (
+    <div
+      className={`sidenav__segment-toggle${twoColumns ? " sidenav__segment-toggle--2" : ""}`}
+      role="radiogroup"
+      aria-label={ariaLabel}
+      style={{ "--active-index": activeIndex } as CSSProperties}
+    >
+      <span className="sidenav__segment-indicator" aria-hidden="true" />
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          className={`sidenav__segment-option${
+            option.text ? " sidenav__segment-option--text" : ""
+          }${value === option.value ? " active" : ""}`}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function ExtrasSubpanel({
   title,
@@ -107,68 +151,35 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
             </>
           ) : panelView === "theme" ? (
             <ExtrasSubpanel title="Theme" onBack={() => setPanelView("menu")}>
-              <div className="sidenav__segment-toggle" role="radiogroup" aria-label="Theme">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={themeMode === "sun"}
-                  className={`sidenav__segment-option${themeMode === "sun" ? " active" : ""}`}
-                  onClick={() => setThemeMode("sun")}
-                >
-                  <i className="fa fa-sun" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={themeMode === "night"}
-                  className={`sidenav__segment-option${themeMode === "night" ? " active" : ""}`}
-                  onClick={() => setThemeMode("night")}
-                >
-                  <i className="fa fa-moon-o" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={themeMode === "auto"}
-                  className={`sidenav__segment-option sidenav__segment-option--text${
-                    themeMode === "auto" ? " active" : ""
-                  }`}
-                  onClick={() => setThemeMode("auto")}
-                >
-                  Auto
-                </button>
-              </div>
+              <SegmentToggle
+                ariaLabel="Theme"
+                value={themeMode}
+                onChange={setThemeMode}
+                options={[
+                  {
+                    value: "sun",
+                    label: <i className="fa fa-sun" aria-hidden="true" />,
+                  },
+                  {
+                    value: "night",
+                    label: <i className="fa fa-moon-o" aria-hidden="true" />,
+                  },
+                  { value: "auto", label: "Auto", text: true },
+                ]}
+              />
             </ExtrasSubpanel>
           ) : (
             <ExtrasSubpanel title="Language" onBack={() => setPanelView("menu")}>
-              <div
-                className="sidenav__segment-toggle sidenav__segment-toggle--2"
-                role="radiogroup"
-                aria-label="Language"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={languageMode === "eng"}
-                  className={`sidenav__segment-option sidenav__segment-option--text${
-                    languageMode === "eng" ? " active" : ""
-                  }`}
-                  onClick={() => setLanguageMode("eng")}
-                >
-                  ENG
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={languageMode === "rus"}
-                  className={`sidenav__segment-option sidenav__segment-option--text${
-                    languageMode === "rus" ? " active" : ""
-                  }`}
-                  onClick={() => setLanguageMode("rus")}
-                >
-                  RUS
-                </button>
-              </div>
+              <SegmentToggle
+                ariaLabel="Language"
+                twoColumns
+                value={languageMode}
+                onChange={setLanguageMode}
+                options={[
+                  { value: "eng", label: "ENG", text: true },
+                  { value: "rus", label: "RUS", text: true },
+                ]}
+              />
             </ExtrasSubpanel>
           )}
         </div>

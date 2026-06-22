@@ -311,19 +311,39 @@ a { color: inherit; text-decoration: none; }
   color: var(--text);
 }
 .sidenav__segment-toggle {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   padding: 3px;
   background: var(--bubble);
   border-radius: 12px;
+  --active-index: 0;
 }
 .sidenav__segment-toggle--2 {
   grid-template-columns: repeat(2, 1fr);
+}
+.sidenav__segment-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border-radius: 10px;
+  background: var(--surface);
+  transform: translateX(calc(var(--active-index) * 100%));
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.sidenav__segment-toggle--2 .sidenav__segment-indicator {
+  width: calc((100% - 6px) / 2);
 }
 .sidenav__segment-option {
   all: unset;
   box-sizing: border-box;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-height: 40px;
   display: flex;
@@ -334,17 +354,18 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-dim);
   font-size: 18px;
   font-weight: 600;
+  transition: color 0.2s ease;
 }
 .sidenav__segment-option--text {
   font-size: 14px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--text-dim);
 }
 .sidenav__segment-option:hover:not(.active) {
   color: var(--text);
 }
 .sidenav__segment-option.active {
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
 }
 
@@ -699,19 +720,11 @@ a { color: inherit; text-decoration: none; }
   all: unset;
   box-sizing: border-box;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: block;
   width: 100%;
   padding: 12px 14px;
   font-weight: 600;
   font-size: 14px;
-}
-.card-menu__item .fa {
-  width: 16px;
-  text-align: center;
-  flex-shrink: 0;
-  color: var(--text-dim);
 }
 .card-menu__item:hover { background: var(--bubble); }
 .card-menu__item--danger { color: var(--error); }
@@ -1617,7 +1630,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .avatar-lightbox,
 .modal-overlay--lightbox,
-.report-problem-lightbox {
+.surface-form-lightbox {
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -1730,38 +1743,38 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .modal__actions .btn { flex: 1; text-align: center; }
 
-/* Report a problem (extras menu) */
-.report-problem-lightbox {
+/* Surface form lightbox (report a problem, edit bio) */
+.surface-form-lightbox {
   position: fixed;
   inset: 0;
   z-index: 120;
   cursor: pointer;
 }
-.report-problem-lightbox__close {
+.surface-form-lightbox__close {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 3;
 }
-.report-problem-lightbox__stage {
+.surface-form-lightbox__stage {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 100%;
-  padding: 56px 20px 24px;
+  height: 100%;
+  padding: 48px 20px 24px;
   box-sizing: border-box;
   cursor: default;
 }
-.report-problem-lightbox__title {
+.surface-form-lightbox__title {
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 700;
   text-align: center;
   color: var(--text);
 }
-.report-problem-form {
+.surface-form-card {
   width: 100%;
   max-width: 520px;
   background: var(--surface);
@@ -1771,7 +1784,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   overflow: hidden;
   cursor: default;
 }
-.report-problem-form textarea {
+.surface-form-card textarea {
   display: block;
   width: 100%;
   min-height: 180px;
@@ -1782,16 +1795,19 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   font: inherit;
   font-size: 15px;
   line-height: 1.45;
-  /* resize: vertical; */
   box-sizing: border-box;
 }
-.report-problem-form textarea:focus {
+.surface-form-card textarea:focus {
   outline: none;
 }
-.report-problem-form textarea::placeholder {
+.surface-form-card textarea::placeholder {
   color: var(--text-dim);
 }
-.report-problem-form__footer {
+.surface-form-card__error {
+  margin: 0;
+  padding: 0 18px 8px;
+}
+.surface-form-card__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;

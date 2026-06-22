@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import { createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
+import { REPLY_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
 import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
 import {
   THEME_BODY_LIMIT,
@@ -24,7 +25,7 @@ export default function ReplyForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const cooldown = useCooldown();
+  const cooldown = useCooldown("reply");
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -60,6 +61,7 @@ export default function ReplyForm({
     try {
       const reply = await createReply(themeId, normalized, parentId);
       setBody("");
+      cooldown.start(REPLY_COOLDOWN_SECONDS);
       emitReplyCreated({
         themeId,
         parentId: parentId ?? null,

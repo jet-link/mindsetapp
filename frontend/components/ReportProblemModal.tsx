@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { THEME_BODY_LIMIT } from "@/lib/theme-body";
 
 export default function ReportProblemModal({
   open,
@@ -12,6 +13,8 @@ export default function ReportProblemModal({
 }) {
   const [body, setBody] = useState("");
   const [mounted, setMounted] = useState(false);
+
+  const overLimit = body.length > THEME_BODY_LIMIT;
 
   useEffect(() => {
     setMounted(true);
@@ -34,7 +37,7 @@ export default function ReportProblemModal({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!body.trim()) return;
+    if (!body.trim() || overLimit) return;
     onClose();
   }
 
@@ -72,22 +75,35 @@ export default function ReportProblemModal({
             rows={6}
           />
           <div className="surface-form-card__footer">
-            <button
-              type="button"
-              className="icon-btn"
-              disabled
-              title="Attach — coming soon"
-              aria-label="Attach file"
+            <div className="surface-form-card__footer-actions">
+              <button
+                type="submit"
+                className="btn"
+                disabled={!body.trim() || overLimit}
+              >
+                Send
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                disabled
+                title="Attach — coming soon"
+                aria-label="Attach file"
+              >
+                <i className="fa fa-paperclip" aria-hidden="true" />
+              </button>
+            </div>
+            <span
+              className={
+                overLimit ? "bio-counter bio-counter--over" : "bio-counter"
+              }
             >
-              <i className="fa fa-paperclip" aria-hidden="true" />
-            </button>
-            <button type="submit" className="btn" disabled={!body.trim()}>
-              Send
-            </button>
+              {body.length}/{THEME_BODY_LIMIT}
+            </span>
           </div>
         </form>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

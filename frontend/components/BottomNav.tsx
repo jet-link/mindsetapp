@@ -14,11 +14,17 @@ import NavProfileLink from "@/components/NavProfileLink";
 import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/RouteTitle";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 
-const AUTH_REQUIRED_HREFS = new Set(["/compose", "/notifications"]);
-
-function navHref(item: NavItem, username: string | null): string {
-  if (AUTH_REQUIRED_HREFS.has(item.href) && !username) return "/login";
-  return item.href;
+function navItemIcon(it: NavItem, unread: number) {
+  return (
+    <span className="bottomnav__icon-wrap">
+      <i className={`fa ${it.icon}`} aria-hidden="true" />
+      {it.badge && unread > 0 && (
+        <span className="nav-badge" aria-label={`${unread} unread notifications`}>
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function BottomNav() {
@@ -63,13 +69,26 @@ export default function BottomNav() {
     <nav className="bottomnav" aria-label="Main navigation">
       {NAV_ITEMS.map((it) => {
         if (it.authOnly && !username) return null;
-        const href = navHref(it, username);
-        const active = pathname === it.href;
-        const isCurrent = pathname === href;
+        const disabled = it.authGated && !username;
+        const active = !disabled && pathname === it.href;
+        if (disabled) {
+          return (
+            <span
+              key={it.href}
+              className="bottomnav__item bottomnav__item--disabled"
+              title={it.label}
+              aria-label={it.label}
+              aria-disabled="true"
+            >
+              {navItemIcon(it, unread)}
+            </span>
+          );
+        }
+        const isCurrent = pathname === it.href;
         return (
           <Link
             key={it.href}
-            href={href}
+            href={it.href}
             className={`bottomnav__item${active ? " active" : ""}`}
             aria-label={it.label}
             title={it.label}
@@ -81,14 +100,7 @@ export default function BottomNav() {
                   : undefined
             }
           >
-            <span className="bottomnav__icon-wrap">
-              <i className={`fa ${it.icon}`} aria-hidden="true" />
-              {it.badge && unread > 0 && (
-                <span className="nav-badge" aria-label={`${unread} unread notifications`}>
-                  {unread > 99 ? "99+" : unread}
-                </span>
-              )}
-            </span>
+            {navItemIcon(it, unread)}
           </Link>
         );
       })}

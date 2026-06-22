@@ -32,7 +32,9 @@ export default function ReportContentModal({
   const [mounted, setMounted] = useState(false);
 
   const title = kind === "theme" ? "Report a theme" : "Report a reply";
-  const canSubmit = reason !== null || other.trim().length > 0;
+  const otherOverLimit = other.length > OTHER_LIMIT;
+  const canSubmit =
+    (reason !== null || other.trim().length > 0) && !otherOverLimit;
 
   useEffect(() => {
     setMounted(true);
@@ -67,7 +69,7 @@ export default function ReportContentModal({
 
   function onOtherChange(value: string) {
     setReason(null);
-    setOther(value.slice(0, OTHER_LIMIT));
+    setOther(value);
   }
 
   function submit(e: React.FormEvent) {
@@ -131,15 +133,18 @@ export default function ReportContentModal({
             onChange={(e) => onOtherChange(e.target.value)}
             placeholder="Other…"
             rows={3}
-            maxLength={OTHER_LIMIT}
           />
-          <div className="surface-form-card__footer surface-form-card__footer--end">
-            <span className="bio-counter">
-              {other.length}/{OTHER_LIMIT}
-            </span>
+          <div className="surface-form-card__footer">
             <button type="submit" className="btn" disabled={!canSubmit}>
               Report
             </button>
+            <span
+              className={
+                otherOverLimit ? "bio-counter bio-counter--over" : "bio-counter"
+              }
+            >
+              {other.length}/{OTHER_LIMIT}
+            </span>
           </div>
         </form>
       </div>

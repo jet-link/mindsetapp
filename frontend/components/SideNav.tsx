@@ -16,11 +16,17 @@ import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/R
 import { bounceNavItem } from "@/lib/nav-bounce";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 
-const AUTH_REQUIRED_HREFS = new Set(["/compose", "/notifications"]);
-
-function navHref(item: NavItem, username: string | null): string {
-  if (AUTH_REQUIRED_HREFS.has(item.href) && !username) return "/login";
-  return item.href;
+function navItemIcon(it: NavItem, unread: number) {
+  return (
+    <span className="sidenav__icon-wrap">
+      <i className={`fa ${it.icon}`} aria-hidden="true" />
+      {it.badge && unread > 0 && (
+        <span className="nav-badge" aria-label={`${unread} unread notifications`}>
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function SideNav() {
@@ -79,13 +85,26 @@ export default function SideNav() {
       <nav className="sidenav__menu" aria-label="Main navigation">
         {NAV_ITEMS.map((it) => {
           if (it.authOnly && !username) return null;
-          const href = navHref(it, username);
-          const active = pathname === it.href;
-          const isCurrent = pathname === href;
+          const disabled = it.authGated && !username;
+          const active = !disabled && pathname === it.href;
+          if (disabled) {
+            return (
+              <span
+                key={it.href}
+                className="sidenav__item sidenav__item--disabled"
+                title={it.label}
+                aria-label={it.label}
+                aria-disabled="true"
+              >
+                {navItemIcon(it, unread)}
+              </span>
+            );
+          }
+          const isCurrent = pathname === it.href;
           return (
             <Link
               key={it.href}
-              href={href}
+              href={it.href}
               prefetch={it.href === "/compose" ? false : undefined}
               className={`sidenav__item${active ? " active" : ""}`}
               title={it.label}
@@ -100,14 +119,7 @@ export default function SideNav() {
                     : undefined
               }
             >
-              <span className="sidenav__icon-wrap">
-                <i className={`fa ${it.icon}`} aria-hidden="true" />
-                {it.badge && unread > 0 && (
-                  <span className="nav-badge" aria-label={`${unread} unread notifications`}>
-                    {unread > 99 ? "99+" : unread}
-                  </span>
-                )}
-              </span>
+              {navItemIcon(it, unread)}
             </Link>
           );
         })}

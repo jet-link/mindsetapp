@@ -249,6 +249,9 @@ export default function ProfileHead({
                 </p>
               )}
               <div className="surface-form-card__footer">
+                <button type="submit" className="btn" disabled={bioBusy || bioOverLimit}>
+                  {bio ? "Edit" : "Add"}
+                </button>
                 <span
                   className={
                     bioOverLimit ? "bio-counter bio-counter--over" : "bio-counter"
@@ -256,9 +259,6 @@ export default function ProfileHead({
                 >
                   {bioCharCount(bioDraft)}/{BIO_LIMIT}
                 </span>
-                <button type="submit" className="btn" disabled={bioBusy || bioOverLimit}>
-                  {bio ? "Edit" : "Add"}
-                </button>
               </div>
             </form>
           </div>

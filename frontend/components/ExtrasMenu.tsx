@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import ReportProblemModal from "@/components/ReportProblemModal";
+import { AUTH_EVENT, isLoggedIn } from "@/lib/api";
 
 type ExtrasPanelView = "menu" | "theme" | "language";
 type ThemeMode = "sun" | "night" | "auto";
@@ -84,7 +85,19 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
   const [themeMode, setThemeMode] = useState<ThemeMode>("sun");
   const [languageMode, setLanguageMode] = useState<LanguageMode>("eng");
   const [reportOpen, setReportOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const loggedIn = isLoggedIn();
+      setAuthed(loggedIn);
+      if (!loggedIn) setReportOpen(false);
+    };
+    syncAuth();
+    window.addEventListener(AUTH_EVENT, syncAuth);
+    return () => window.removeEventListener(AUTH_EVENT, syncAuth);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -137,17 +150,19 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 Language
                 <i className="fa fa-chevron-right" aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                className="sidenav__extras-item"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  setReportOpen(true);
-                }}
-              >
-                Report a problem
-              </button>
+              {authed && (
+                <button
+                  type="button"
+                  className="sidenav__extras-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    setReportOpen(true);
+                  }}
+                >
+                  Report a problem
+                </button>
+              )}
             </>
           ) : panelView === "theme" ? (
             <ExtrasSubpanel title="Theme" onBack={() => setPanelView("menu")}>

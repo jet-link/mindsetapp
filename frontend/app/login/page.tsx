@@ -211,6 +211,13 @@ export default function LoginPage() {
       </div>
 
       {mode === "login" && (
+        <p className="form-page__forgot">
+          <a href="#">Forgot the password?</a>
+        </p>
+      )}
+
+      {/* Remember me — скрыто
+      {mode === "login" && (
         <label className="remember-me">
           <input
             type="checkbox"
@@ -220,6 +227,7 @@ export default function LoginPage() {
           <span>Remember me</span>
         </label>
       )}
+      */}
 
       {errorText && (
         <div className="error" role="alert">
@@ -246,10 +254,10 @@ export default function LoginPage() {
       <button
         type="button"
         className="btn btn--ghost btn--google"
-        aria-label="Sign up with Google"
+        aria-label={mode === "login" ? "Log in with Google" : "Sign up with Google"}
       >
         <GoogleIcon />
-        Sign up with Google
+        {mode === "login" ? "Log in with Google" : "Sign up with Google"}
       </button>
     </form>
   );

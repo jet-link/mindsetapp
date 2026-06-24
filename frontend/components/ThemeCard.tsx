@@ -36,6 +36,7 @@ export default function ThemeCard({
   listExitViaParent = false,
   onDeleteExitStart,
   onDeleteExitFailed,
+  onOpen,
 }: {
   theme: Theme;
   clickable?: boolean;
@@ -49,6 +50,7 @@ export default function ThemeCard({
   listExitViaParent?: boolean;
   onDeleteExitStart?: () => void;
   onDeleteExitFailed?: () => void;
+  onOpen?: () => void;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
@@ -169,6 +171,7 @@ export default function ThemeCard({
   function openThread() {
     saveReturnAnchor({ kind: "theme", id: theme.id });
     seedThreadTheme(theme);
+    onOpen?.();
     router.push(`/thread/${theme.id}`);
   }
 

@@ -630,29 +630,6 @@ export const clearNotifications = () =>
   apiFetch<{ deleted: number }>("/api/v1/notifications/clear/", { method: "POST" });
 
 // --- Search ---
-export type DiscoverMode = "popular" | "trending";
-
-export interface DiscoverPayload {
-  mode: DiscoverMode;
-  themes: string[];
-  users: string[];
-  cached_until?: string;
-}
-
-export interface PopularQueriesPayload {
-  themes: string[];
-  users: string[];
-  cached_until?: string;
-}
-
-export const getDiscover = (mode: DiscoverMode = "popular") =>
-  apiFetch<DiscoverPayload>(`/api/v1/search/discover/?mode=${mode}`);
-
-export const getPopularQueries = () =>
-  apiFetch<PopularQueriesPayload>("/api/v1/search/popular/");
-
-/** @deprecated use getDiscover / getPopularQueries */
-export const getPopularSearches = getPopularQueries;
 
 export const searchThemes = (q: string, cursor?: string, signal?: AbortSignal) =>
   apiFetch<CursorPage<Theme>>(

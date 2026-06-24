@@ -152,8 +152,8 @@ def get_discover(mode: str = 'popular') -> dict:
     return payload
 
 
-def get_popular_queries(limit: int = 6) -> dict:
-    """Popular search queries из SearchEvent за rolling window."""
+def get_popular_queries(limit: int = 15) -> dict:
+    """Popular search queries из SearchEvent (только зарегистрированные пользователи)."""
     from .models import SearchEvent
 
     cached = cache.get(POPULAR_QUERIES_CACHE_KEY)
@@ -164,14 +164,22 @@ def get_popular_queries(limit: int = 6) -> dict:
     min_count = _popular_min_occurrences()
 
     theme_rows = (
-        SearchEvent.objects.filter(tab=SearchEvent.Tab.THEMES, created_at__gte=since)
+        SearchEvent.objects.filter(
+            tab=SearchEvent.Tab.THEMES,
+            created_at__gte=since,
+            user__isnull=False,
+        )
         .values('query_normalized')
         .annotate(c=Count('id'))
         .filter(c__gte=min_count)
         .order_by('-c', 'query_normalized')[:limit]
     )
     user_rows = (
-        SearchEvent.objects.filter(tab=SearchEvent.Tab.USERS, created_at__gte=since)
+        SearchEvent.objects.filter(
+            tab=SearchEvent.Tab.USERS,
+            created_at__gte=since,
+            user__isnull=False,
+        )
         .values('query_normalized')
         .annotate(c=Count('id'))
         .filter(c__gte=min_count)

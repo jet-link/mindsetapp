@@ -11,20 +11,17 @@ import {
   UserPublic,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
-  DiscoverMode,
-  getDiscover,
-  getPopularQueries,
+  AUTH_EVENT,
+  getStoredUsername,
+  isLoggedIn,
   searchThemes,
   searchUsers,
 } from "@/lib/api";
 import {
+  clearRecentSearches,
   pushRecentSearch,
-  readDiscoverCache,
-  readPopularQueriesCache,
   readRecentSearches,
   type RecentSearch,
-  writeDiscoverCache,
-  writePopularQueriesCache,
 } from "@/lib/search-discover-cache";
 import { patchThemeAuthors, patchUserPublicList } from "@/lib/user-avatar-store";
 import { findReturnAnchorByPrefix, parseListKeySearchParams, setListKey } from "@/lib/return-anchor";
@@ -48,37 +45,24 @@ function parseTab(value: string | null): SearchTab {
   return value === "users" ? "users" : "themes";
 }
 
-function parseDiscoverMode(value: string | null): DiscoverMode {
-  return value === "trending" ? "trending" : "popular";
-}
-
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlTab = parseTab(searchParams.get("tab"));
   const urlQuery = searchParams.get("q") ?? "";
-  const urlDiscoverMode = parseDiscoverMode(searchParams.get("discover"));
 
   const returnAnchor = findReturnAnchorByPrefix("/search?");
   const returnParams = returnAnchor ? parseListKeySearchParams(returnAnchor.listKey) : null;
   const initialTab = returnParams ? parseTab(returnParams.get("tab")) : urlTab;
   const initialQuery = returnParams?.get("q") ?? urlQuery;
 
+  const [authed, setAuthed] = useState(false);
   const [query, setQuery] = useState(initialQuery);
   const [tab, setTab] = useState<SearchTab>(initialTab);
-  const [discoverMode, setDiscoverMode] = useState<DiscoverMode>(urlDiscoverMode);
   const [themeResults, setThemeResults] = useState<Theme[]>([]);
   const [userResults, setUserResults] = useState<UserPublic[]>([]);
   const [themeNextCursor, setThemeNextCursor] = useState<string | null>(null);
   const [userNextCursor, setUserNextCursor] = useState<string | null>(null);
-  const [discover, setDiscover] = useState<{ themes: string[]; users: string[] }>({
-    themes: [],
-    users: [],
-  });
-  const [popularQueries, setPopularQueries] = useState<{ themes: string[]; users: string[] }>({
-    themes: [],
-    users: [],
-  });
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [fetching, setFetching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -94,35 +78,24 @@ export default function SearchPage() {
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
   const syncedUrlRef = useRef(false);
+  const queryRef = useRef(query);
+  const ownerRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setRecentSearches(readRecentSearches());
-  }, []);
+    queryRef.current = query;
+  }, [query]);
 
   useEffect(() => {
-    const cached = readDiscoverCache(discoverMode);
-    if (cached) {
-      setDiscover({ themes: cached.themes, users: cached.users });
-    }
-    getDiscover(discoverMode)
-      .then((data) => {
-        setDiscover({ themes: data.themes, users: data.users });
-        writeDiscoverCache(data);
-      })
-      .catch(() => {});
-  }, [discoverMode]);
-
-  useEffect(() => {
-    const cached = readPopularQueriesCache();
-    if (cached) {
-      setPopularQueries({ themes: cached.themes, users: cached.users });
-    }
-    getPopularQueries()
-      .then((data) => {
-        setPopularQueries({ themes: data.themes, users: data.users });
-        writePopularQueriesCache(data);
-      })
-      .catch(() => {});
+    const syncAuth = () => {
+      const loggedIn = isLoggedIn();
+      const owner = loggedIn ? getStoredUsername() : null;
+      ownerRef.current = owner;
+      setAuthed(loggedIn);
+      setRecentSearches(readRecentSearches(owner));
+    };
+    syncAuth();
+    window.addEventListener(AUTH_EVENT, syncAuth);
+    return () => window.removeEventListener(AUTH_EVENT, syncAuth);
   }, []);
 
   useEffect(() => {
@@ -150,13 +123,11 @@ export default function SearchPage() {
   }, []);
 
   const syncUrl = useCallback(
-    (nextTab: SearchTab, nextQuery: string, nextDiscover: DiscoverMode) => {
+    (nextTab: SearchTab, nextQuery: string) => {
       const params = new URLSearchParams();
       params.set("tab", nextTab);
       if (nextQuery.trim()) params.set("q", nextQuery.trim());
-      if (!nextQuery.trim()) params.set("discover", nextDiscover);
-      const next = `/search?${params.toString()}`;
-      router.replace(next, { scroll: false });
+      router.replace(`/search?${params.toString()}`, { scroll: false });
     },
     [router],
   );
@@ -166,8 +137,8 @@ export default function SearchPage() {
       syncedUrlRef.current = true;
       return;
     }
-    syncUrl(tab, query, discoverMode);
-  }, [tab, query, discoverMode, syncUrl]);
+    syncUrl(tab, query);
+  }, [tab, query, syncUrl]);
 
   const applyCache = useCallback((key: string) => {
     const hit = cacheRef.current.get(key);
@@ -238,8 +209,6 @@ export default function SearchPage() {
               items: page.results,
               nextCursor: page.next ?? null,
             });
-            pushRecentSearch("themes", q);
-            setRecentSearches(readRecentSearches());
           }
         } else {
           const page = await searchUsers(q, cursor, controller.signal);
@@ -254,8 +223,6 @@ export default function SearchPage() {
               items: page.results,
               nextCursor: page.next ?? null,
             });
-            pushRecentSearch("users", q);
-            setRecentSearches(readRecentSearches());
           }
         }
         setError("");
@@ -320,20 +287,34 @@ export default function SearchPage() {
     onLoadMore: loadMore,
   });
 
-  function applyChip(value: string, chipTab: SearchTab) {
-    setTab(chipTab);
-    setQuery(chipTab === "themes" && !value.startsWith("#") ? `#${value}` : value);
+  function applyRecentChip(item: RecentSearch) {
+    setTab(item.tab);
+    setQuery(item.query);
   }
 
-  const discoverItems = tab === "themes" ? discover.themes : discover.users;
-  const popularItems = tab === "themes" ? popularQueries.themes : popularQueries.users;
-  const recentItems = recentSearches.filter((r) => r.tab === tab);
+  function clearHistory() {
+    if (!authed) return;
+    const owner = ownerRef.current;
+    clearRecentSearches(owner, tab);
+    setRecentSearches(readRecentSearches(owner));
+  }
+
+  function recordResultClick(activeTab: SearchTab) {
+    const q = queryRef.current.trim();
+    if (q.length < MIN_QUERY_LEN) return;
+    const owner = ownerRef.current;
+    pushRecentSearch(owner, activeTab, q);
+    setRecentSearches(readRecentSearches(owner));
+  }
+
+  const recentItems = recentSearches.filter((item) => item.tab === tab);
+  const showRecentSection = showDiscover && (authed || recentItems.length > 0);
 
   const searchLabel =
     tab === "themes" ? "Search themes or hashtags" : "Search users";
 
   return (
-    <main>
+    <main className={`search-page${showDiscover ? " search-page--discover" : ""}`}>
       <PageHeader title="Search" showBack={false} />
 
       <div role="tablist" aria-label="Search type" className="search-tabs">
@@ -389,93 +370,44 @@ export default function SearchPage() {
         )}
       </form>
 
-      {showDiscover && (
+      {showRecentSection && (
         <div className="discover-search">
-          <div className="discover-search__head">
-            <h2 className="section-title">Discover</h2>
-            <div className="discover-search__mode" role="group" aria-label="Discover mode">
-              <button
-                type="button"
-                className={discoverMode === "popular" ? "active" : ""}
-                aria-pressed={discoverMode === "popular"}
-                onClick={() => setDiscoverMode("popular")}
-              >
-                Popular
-              </button>
-              <button
-                type="button"
-                className={discoverMode === "trending" ? "active" : ""}
-                aria-pressed={discoverMode === "trending"}
-                onClick={() => setDiscoverMode("trending")}
-              >
-                Trending
-              </button>
-            </div>
+          <div className="discover-search__group">
+            {recentItems.length > 0 ? (
+              <>
+                <div className="discover-search__head-row">
+                  <span className="discover-search__label">Recent searches</span>
+                  {authed && (
+                    <button
+                      type="button"
+                      className="discover-search__clear"
+                      onClick={clearHistory}
+                    >
+                      Clear history
+                    </button>
+                  )}
+                </div>
+                <div className="discover-search__panel">
+                  <ul className="discover-search__list">
+                    {recentItems.map((item) => (
+                      <li key={`recent-${item.tab}-${item.query}`}>
+                        <button
+                          type="button"
+                          className="discover-search__item"
+                          onClick={() => applyRecentChip(item)}
+                        >
+                          <i className="fa fa-clock-o" aria-hidden="true" />
+                          <span>{item.query}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <p className="discover-search__empty muted">No recent searches!</p>
+            )}
           </div>
-
-          {discoverItems.length > 0 && (
-            <div className="discover-search__group">
-              <span className="discover-search__label">
-                {tab === "themes"
-                  ? discoverMode === "trending"
-                    ? "Trending hashtags"
-                    : "Popular hashtags"
-                  : discoverMode === "trending"
-                    ? "Trending accounts"
-                    : "Popular accounts"}
-              </span>
-              <div className="discover-search__chips" role="group">
-                {discoverItems.map((item) => (
-                  <button
-                    key={`d-${item}`}
-                    type="button"
-                    className="discover-search__chip"
-                    onClick={() => applyChip(item, tab)}
-                  >
-                    {tab === "themes" ? `#${item}` : item}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {popularItems.length > 0 && (
-            <div className="discover-search__group">
-              <span className="discover-search__label">Popular searches</span>
-              <div className="discover-search__chips" role="group">
-                {popularItems.map((item) => (
-                  <button
-                    key={`p-${item}`}
-                    type="button"
-                    className="discover-search__chip discover-search__chip--muted"
-                    onClick={() => applyChip(item, tab)}
-                  >
-                    {tab === "themes" && !item.startsWith("#") ? `#${item}` : item}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {recentItems.length > 0 && (
-            <div className="discover-search__group">
-              <span className="discover-search__label">Recent</span>
-              <div className="discover-search__chips" role="group">
-                {recentItems.map((item) => (
-                  <button
-                    key={`r-${item.tab}-${item.query}`}
-                    type="button"
-                    className="discover-search__chip discover-search__chip--recent"
-                    onClick={() => applyChip(item.query, item.tab)}
-                  >
-                    {item.tab === "themes" && !item.query.startsWith("#")
-                      ? `#${item.query}`
-                      : item.query}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -501,28 +433,9 @@ export default function SearchPage() {
             </p>
           )}
           {showEmpty && (
-            <div className="search-results__empty">
-              <p className="search-results__message muted">
-                {tab === "themes" ? "No themes found." : "No users found."}
-              </p>
-              {discoverItems.length > 0 && (
-                <div className="discover-search discover-search--inline">
-                  <span className="discover-search__label">Try discovering</span>
-                  <div className="discover-search__chips">
-                    {discoverItems.slice(0, 4).map((item) => (
-                      <button
-                        key={`e-${item}`}
-                        type="button"
-                        className="discover-search__chip"
-                        onClick={() => applyChip(item, tab)}
-                      >
-                        {tab === "themes" ? `#${item}` : item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <p className="search-results__message muted">
+              {tab === "themes" ? "No themes found." : "No users found."}
+            </p>
           )}
 
           {tab === "themes" &&
@@ -530,13 +443,19 @@ export default function SearchPage() {
               <ThemeCard
                 key={t.id}
                 theme={t}
+                onOpen={() => recordResultClick("themes")}
                 onDeleted={() => setThemeResults((prev) => prev.filter((x) => x.id !== t.id))}
               />
             ))}
 
           {tab === "users" &&
             userResults.map((u) => (
-              <Link key={u.id} href={`/u/${u.username}`} className="user-row user-row--search">
+              <Link
+                key={u.id}
+                href={`/u/${u.username}`}
+                className="user-row user-row--search"
+                onClick={() => recordResultClick("users")}
+              >
                 <Avatar username={u.username} src={u.avatar} />
                 <div className="user-row__main">
                   <span className="username">{u.username}</span>

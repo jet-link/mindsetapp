@@ -17,6 +17,11 @@ celery>=5.4
 # --- Content pipeline ---
 bleach>=6.0
 Pillow>=10.0
+# Видео: постер (первый кадр) + метаданные извлекаются через системные
+# бинарники ffmpeg/ffprobe (вызываются как subprocess; отдельный pip-пакет не
+# нужен). Установка: macOS `brew install ffmpeg`, Debian/Ubuntu
+# `apt-get install ffmpeg`. Без ffmpeg видео всё равно загружается, но без
+# серверного постера (фронт показывает первый кадр через <video preload>).
 
 # --- Tooling ---
 python-dotenv>=1.0

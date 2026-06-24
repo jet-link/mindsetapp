@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, MouseEvent } from "react";
 import CardMenu from "@/components/CardMenu";
 import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
+import MediaCarousel from "@/components/MediaCarousel";
 import {
   REPLY_CREATED_EVENT,
   ReplyCreatedDetail,
@@ -247,25 +248,14 @@ export default function ThemeCard({
         </div>
 
         <div
-          className={`body-html body-html--boxed${clickable ? " body-html--clickable" : ""}`}
+          className={`body-html--boxed${clickable ? " body-html--clickable" : ""}`}
           onClick={onBodyClick}
-          dangerouslySetInnerHTML={{ __html: theme.body }}
-        />
-
-        {theme.images.length > 0 && (
-          <div className="card-media">
-            {theme.images.map((img) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={img.id}
-                src={img.medium_url}
-                srcSet={img.srcset}
-                sizes="(max-width: 620px) 90vw, 560px"
-                alt=""
-              />
-            ))}
-          </div>
-        )}
+        >
+          {theme.body && (
+            <div className="body-html" dangerouslySetInnerHTML={{ __html: theme.body }} />
+          )}
+          {theme.media.length > 0 && <MediaCarousel media={theme.media} />}
+        </div>
 
         <div className="actions">
           <button

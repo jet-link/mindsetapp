@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
+import {
+  MediaAttachButton,
+  MediaPreviews,
+  useMediaPicker,
+} from "@/components/MediaPickerField";
 import { createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
 import { REPLY_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
 import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
@@ -26,6 +31,7 @@ export default function ReplyForm({
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const cooldown = useCooldown("reply");
+  const picker = useMediaPicker(5);
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -55,12 +61,14 @@ export default function ReplyForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const normalized = normalizeThemeBody(body);
-    if (!normalized.trim() || themeCharCount(normalized) > THEME_BODY_LIMIT) return;
+    const hasMedia = picker.files.length > 0;
+    if ((!normalized.trim() && !hasMedia) || themeCharCount(normalized) > THEME_BODY_LIMIT) return;
     setBusy(true);
     setError("");
     try {
-      const reply = await createReply(themeId, normalized, parentId);
+      const reply = await createReply(themeId, normalized, parentId, picker.files);
       setBody("");
+      picker.clear();
       cooldown.start(REPLY_COOLDOWN_SECONDS);
       emitReplyCreated({
         themeId,
@@ -98,12 +106,14 @@ export default function ReplyForm({
       />
       <div className="composer-footer">
         <div className="composer-actions">
-          <button className="btn" type="submit" disabled={busy || !body.trim() || overLimit || cooldown.active}>
-            Reply
+          <button
+            className="btn"
+            type="submit"
+            disabled={busy || (!body.trim() && picker.files.length === 0) || overLimit || cooldown.active}
+          >
+            {busy ? <span className="btn-spinner" aria-hidden="true" /> : "Reply"}
           </button>
-          <button type="button" className="icon-btn" disabled title="Attach — coming soon" aria-label="Attach file">
-            <i className="fa fa-paperclip" aria-hidden="true" />
-          </button>
+          <MediaAttachButton picker={picker} disabled={busy} />
         </div>
         <div className="composer-meta">
           {cooldown.active ? (
@@ -115,6 +125,12 @@ export default function ReplyForm({
           )}
         </div>
       </div>
+      <MediaPreviews picker={picker} />
+      {busy && picker.files.length > 0 && (
+        <div className="composer-uploading" role="status">
+          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> Publishing media…
+        </div>
+      )}
       {error && (
         <div className="error" role="alert">
           {error}

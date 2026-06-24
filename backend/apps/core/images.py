@@ -55,14 +55,14 @@ def compute_orientation_kind(width: Optional[int], height: Optional[int]) -> str
     return ORIENTATION_LANDSCAPE
 
 
-def _validate_bytes(raw: bytes, content_type: str):
+def _validate_bytes(raw: bytes, content_type: str, max_bytes: int = MAX_FILE_SIZE_BYTES):
     ct = (content_type or '').lower().strip()
     if ct not in ALLOWED_MIME_TYPES:
         raise ValueError(f'Unsupported image type: {ct}')
-    if len(raw) > MAX_FILE_SIZE_BYTES:
+    if len(raw) > max_bytes:
         raise ValueError(
             f'File too large ({len(raw) / (1024 * 1024):.1f} MB). '
-            f'Maximum allowed: {MAX_FILE_SIZE_BYTES / (1024 * 1024):.0f} MB'
+            f'Maximum allowed: {max_bytes / (1024 * 1024):.0f} MB'
         )
 
 
@@ -107,8 +107,9 @@ def _unique_storage_rel_path(item_id, suffix, original_name, sample_bytes):
     return f'items/{item_id}/{suffix}/{base}_{h}_{ts}_{nonce}.webp'
 
 
-def process_image_bytes(raw: bytes, content_type: str, original_name: str, item_id) -> dict:
-    _validate_bytes(raw, content_type)
+def process_image_bytes(raw: bytes, content_type: str, original_name: str, item_id,
+                        max_bytes: int = MAX_FILE_SIZE_BYTES) -> dict:
+    _validate_bytes(raw, content_type, max_bytes)
     img = _open_image(io.BytesIO(raw))
 
     large_data, large_w, large_h = _save_webp(img, SIZE_LARGE)
@@ -139,7 +140,8 @@ def process_image_bytes(raw: bytes, content_type: str, original_name: str, item_
     }
 
 
-def process_uploaded_files_parallel(uploaded_files, item_id, max_workers=IMAGE_PROCESS_MAX_WORKERS):
+def process_uploaded_files_parallel(uploaded_files, item_id, max_workers=IMAGE_PROCESS_MAX_WORKERS,
+                                    max_bytes=MAX_FILE_SIZE_BYTES):
     """Читает файлы в текущем потоке, декодирование/WebP — в пуле.
     Возвращает список dict | None той же длины и порядка."""
     bundles = []
@@ -156,7 +158,7 @@ def process_uploaded_files_parallel(uploaded_files, item_id, max_workers=IMAGE_P
     def _one(bundle):
         raw, ct, name = bundle
         try:
-            return process_image_bytes(raw, ct, name, item_id)
+            return process_image_bytes(raw, ct, name, item_id, max_bytes=max_bytes)
         except Exception as e:
             logger.exception('Image processing failed for item %s: %s', item_id, e)
             return None

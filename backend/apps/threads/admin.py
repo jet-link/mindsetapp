@@ -1,10 +1,10 @@
 from django.contrib import admin
 
-from .models import Hashtag, Reply, ReplyImage, Theme, ThemeImage
+from .models import Hashtag, Reply, ReplyMedia, Theme, ThemeMedia
 
 
-class ThemeImageInline(admin.TabularInline):
-    model = ThemeImage
+class ThemeMediaInline(admin.TabularInline):
+    model = ThemeMedia
     extra = 0
 
 
@@ -15,7 +15,7 @@ class ThemeAdmin(admin.ModelAdmin):
     list_filter = ('is_deleted',)
     search_fields = ('body_text', 'author__username')
     raw_id_fields = ('author',)
-    inlines = (ThemeImageInline,)
+    inlines = (ThemeMediaInline,)
 
 
 @admin.register(Reply)
@@ -33,7 +33,8 @@ class HashtagAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
 
 
-@admin.register(ReplyImage)
-class ReplyImageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'reply', 'uploaded_at')
+@admin.register(ReplyMedia)
+class ReplyMediaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'reply', 'kind', 'uploaded_at')
+    list_filter = ('kind',)
     raw_id_fields = ('reply',)

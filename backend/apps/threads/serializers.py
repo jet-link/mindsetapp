@@ -4,34 +4,22 @@ from apps.core.text import normalize_theme_body, theme_body_length, THEME_BODY_M
 
 from apps.users.serializers import UserPublicSerializer
 
-from .models import Hashtag, Reply, ReplyImage, Theme, ThemeImage
+from .models import Hashtag, Reply, ReplyMedia, Theme, ThemeMedia
 
 
-class ThemeImageSerializer(serializers.ModelSerializer):
+class MediaSerializer(serializers.Serializer):
+    """Формат медиа (только фото) для тем и ответов."""
+
+    id = serializers.IntegerField(read_only=True)
+    kind = serializers.CharField(read_only=True)
+    sort_order = serializers.IntegerField(read_only=True)
+    width = serializers.IntegerField(read_only=True, allow_null=True)
+    height = serializers.IntegerField(read_only=True, allow_null=True)
+    orientation_kind = serializers.CharField(read_only=True)
     url = serializers.CharField(source='get_url', read_only=True)
     thumbnail_url = serializers.CharField(source='get_thumbnail_url', read_only=True)
     medium_url = serializers.CharField(source='get_medium_url', read_only=True)
     srcset = serializers.CharField(source='get_srcset', read_only=True)
-
-    class Meta:
-        model = ThemeImage
-        fields = (
-            'id', 'url', 'thumbnail_url', 'medium_url', 'srcset',
-            'width', 'height', 'orientation_kind', 'sort_order',
-        )
-        read_only_fields = fields
-
-
-class ReplyImageSerializer(serializers.ModelSerializer):
-    url = serializers.CharField(source='get_url', read_only=True)
-    thumbnail_url = serializers.CharField(source='get_thumbnail_url', read_only=True)
-    medium_url = serializers.CharField(source='get_medium_url', read_only=True)
-    srcset = serializers.CharField(source='get_srcset', read_only=True)
-
-    class Meta:
-        model = ReplyImage
-        fields = ('id', 'url', 'thumbnail_url', 'medium_url', 'srcset', 'width', 'height')
-        read_only_fields = fields
 
 
 class HashtagSerializer(serializers.ModelSerializer):
@@ -63,14 +51,14 @@ class _ViewerFlagsMixin(serializers.Serializer):
 
 class ReplySerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
     author = UserPublicSerializer(read_only=True)
-    image = ReplyImageSerializer(read_only=True)
+    media = MediaSerializer(many=True, read_only=True)
     human_published = serializers.CharField(read_only=True)
     is_deletable = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Reply
         fields = (
-            'id', 'theme_id', 'parent_id', 'author', 'body', 'image',
+            'id', 'theme_id', 'parent_id', 'author', 'body', 'media',
             'replies_count', 'likes_count', 'reposts_count',
             'is_liked', 'is_reposted',
             'created_at', 'human_published', 'is_deletable',
@@ -79,12 +67,17 @@ class ReplySerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
 
 
 class ProfileReplySerializer(ReplySerializer):
-    """Ответ в профиле: вместе с темой, на которую отвечали."""
+    """Ответ в профиле: вместе с темой и родительским ответом (если есть).
+
+    Если пользователь ответил напрямую на тему — фронт показывает тему.
+    Если ответил на чужой ответ — показываем родительский ответ (parent),
+    а тему оставляем для навигации/счётчиков."""
 
     theme = serializers.SerializerMethodField()
+    parent = serializers.SerializerMethodField()
 
     class Meta(ReplySerializer.Meta):
-        fields = ReplySerializer.Meta.fields + ('theme',)
+        fields = ReplySerializer.Meta.fields + ('theme', 'parent')
 
     def get_theme(self, reply: Reply) -> dict:
         ctx = {
@@ -95,10 +88,23 @@ class ProfileReplySerializer(ReplySerializer):
         }
         return ThemeSerializer(reply.theme, context=ctx).data
 
+    def get_parent(self, reply: Reply):
+        if not reply.parent_id:
+            return None
+        parent = reply.parent
+        if parent is None or parent.is_deleted:
+            return None
+        ctx = {
+            'request': self.context.get('request'),
+            'liked_ids': self.context.get('parent_liked_ids', set()),
+            'reposted_ids': self.context.get('parent_reposted_ids', set()),
+        }
+        return ReplySerializer(parent, context=ctx).data
+
 
 class ThemeSerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
     author = UserPublicSerializer(read_only=True)
-    images = ThemeImageSerializer(many=True, read_only=True)
+    media = MediaSerializer(many=True, read_only=True)
     hashtags = HashtagSerializer(many=True, read_only=True)
     human_published = serializers.CharField(read_only=True)
     preview = serializers.CharField(read_only=True)
@@ -112,7 +118,7 @@ class ThemeSerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
         model = Theme
         fields = (
             'id', 'author', 'body', 'body_text', 'preview',
-            'images', 'hashtags',
+            'media', 'hashtags',
             'replies_count', 'likes_count', 'reposts_count', 'shares_count',
             'is_liked', 'is_reposted', 'is_shared',
             'created_at', 'updated_at', 'human_published', 'is_editable', 'is_deletable',
@@ -124,9 +130,9 @@ class ThemeCreateSerializer(serializers.Serializer):
     """Вход на создание/редактирование темы; body — сырой HTML/текст,
     санитизация в сервисном слое."""
 
-    body = serializers.CharField(max_length=20000)
-    images = serializers.ListField(
-        child=serializers.ImageField(), required=False, max_length=3
+    body = serializers.CharField(max_length=20000, required=False, allow_blank=True, default='')
+    media = serializers.ListField(
+        child=serializers.FileField(), required=False, max_length=10
     )
 
     def validate_body(self, value: str) -> str:
@@ -139,10 +145,10 @@ class ThemeCreateSerializer(serializers.Serializer):
 
 
 class ReplyCreateSerializer(serializers.Serializer):
-    body = serializers.CharField(max_length=10000)
+    body = serializers.CharField(max_length=10000, required=False, allow_blank=True, default='')
     parent_id = serializers.IntegerField(required=False, allow_null=True)
-    images = serializers.ListField(
-        child=serializers.ImageField(), required=False, max_length=1
+    media = serializers.ListField(
+        child=serializers.FileField(), required=False, max_length=5
     )
 
     def validate_body(self, value: str) -> str:

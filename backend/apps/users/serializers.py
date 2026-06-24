@@ -74,14 +74,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return Reply.objects.filter(author=obj, is_deleted=False).count()
 
     def get_media_count(self, obj) -> int:
-        from apps.threads.models import Theme
+        from apps.threads.models import ReplyMedia, ThemeMedia
 
-        return (
-            Theme.objects
-            .filter(author=obj, is_deleted=False, images__isnull=False)
-            .distinct()
-            .count()
-        )
+        theme_media = ThemeMedia.objects.filter(
+            theme__author=obj, theme__is_deleted=False,
+        ).count()
+        reply_media = ReplyMedia.objects.filter(
+            reply__author=obj,
+            reply__is_deleted=False,
+            reply__theme__is_deleted=False,
+        ).count()
+        return theme_media + reply_media
 
     def get_reposts_count(self, obj) -> int:
         from apps.threads.models import ThemeRepost

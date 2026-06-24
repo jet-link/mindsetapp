@@ -12,8 +12,18 @@ from django.db import transaction
 from apps.core.text import html_to_plain_text
 from apps.notifications.services import delete_repost_notification, delete_reply_notifications, notify
 
+import logging
+
 from .body_html import extract_hashtags, normalise_hashtags, render_body
-from .image_service import attach_reply_image, attach_theme_images
+from .media_service import (
+    MindsetMediaError,
+    attach_reply_media,
+    attach_theme_media,
+    validate_reply_media,
+    validate_theme_media,
+)
+
+logger = logging.getLogger(__name__)
 from .models import (
     Hashtag,
     Reply,
@@ -35,17 +45,33 @@ def _sync_hashtags(theme: Theme, raw_body: str) -> None:
     theme.hashtags.set(tags)
 
 
-@transaction.atomic
-def create_theme(*, author, body: str, images: Sequence = ()) -> Theme:
-    html = render_body(body)
-    theme = Theme.objects.create(
-        author=author,
-        body=html,
-        body_text=html_to_plain_text(html),
-    )
-    _sync_hashtags(theme, body)
-    if images:
-        attach_theme_images(theme, images)
+def create_theme(*, author, body: str, media: Sequence = ()) -> Theme:
+    # Дешёвая валидация ДО создания темы — частые ошибки (тип/размер/лимит)
+    # отдаём как 400, не плодя пустых тем.
+    files = [f for f in (media or []) if f]
+    if files:
+        validate_theme_media(files)
+
+    with transaction.atomic():
+        html = render_body(body)
+        theme = Theme.objects.create(
+            author=author,
+            body=html,
+            body_text=html_to_plain_text(html),
+        )
+        _sync_hashtags(theme, body)
+
+    # Тяжёлую обработку медиа держим ВНЕ транзакции (CPU/IO не блокируют БД).
+    if files:
+        try:
+            attach_theme_media(theme, files)
+        except MindsetMediaError:
+            theme.delete()
+            raise
+        except Exception:
+            theme.delete()
+            logger.exception('Theme media processing failed (theme would-be %s)', theme.pk)
+            raise MindsetMediaError('Failed to process media. Please try again.')
     return theme
 
 
@@ -59,17 +85,31 @@ def update_theme(*, theme: Theme, body: str) -> Theme:
     return theme
 
 
-@transaction.atomic
 def create_reply(*, theme: Theme, author, body: str, parent: Reply | None = None,
-                 images: Sequence = ()) -> Reply:
-    reply = Reply.objects.create(
-        theme=theme,
-        author=author,
-        parent=parent,
-        body=render_body(body),
-    )
-    if images:
-        attach_reply_image(reply, images)
+                 media: Sequence = ()) -> Reply:
+    files = [f for f in (media or []) if f]
+    if files:
+        validate_reply_media(files)
+
+    with transaction.atomic():
+        reply = Reply.objects.create(
+            theme=theme,
+            author=author,
+            parent=parent,
+            body=render_body(body),
+        )
+
+    if files:
+        try:
+            attach_reply_media(reply, files)
+        except MindsetMediaError:
+            reply.delete()
+            raise
+        except Exception:
+            reply.delete()
+            logger.exception('Reply media processing failed (reply %s)', reply.pk)
+            raise MindsetMediaError('Failed to process media. Please try again.')
+
     notify(recipient=theme.author, actor=author, verb='reply', theme=theme, reply=reply)
     if parent is not None and parent.author_id != theme.author_id:
         notify(recipient=parent.author, actor=author, verb='reply', theme=theme, reply=reply)

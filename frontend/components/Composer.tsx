@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ComposerTextarea from "@/components/ComposerTextarea";
+import {
+  MediaAttachButton,
+  MediaPreviews,
+  useMediaPicker,
+} from "@/components/MediaPickerField";
 import { Theme, createTheme, emitThemeCreated, isLoggedIn } from "@/lib/api";
 import { THEME_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
 import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
@@ -18,6 +23,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const cooldown = useCooldown("theme");
+  const picker = useMediaPicker(10);
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -47,12 +53,14 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const normalized = normalizeThemeBody(body);
-    if (!normalized.trim() || themeCharCount(normalized) > THEME_BODY_LIMIT) return;
+    const hasMedia = picker.files.length > 0;
+    if ((!normalized.trim() && !hasMedia) || themeCharCount(normalized) > THEME_BODY_LIMIT) return;
     setBusy(true);
     setError("");
     try {
-      const theme = await createTheme(normalized);
+      const theme = await createTheme(normalized, picker.files);
       setBody("");
+      picker.clear();
       cooldown.start(THEME_COOLDOWN_SECONDS);
       emitThemeCreated(theme);
       onPosted?.(theme);
@@ -87,13 +95,15 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
           <button
             className="btn"
             type="submit"
-            disabled={busy || !body.trim() || overLimit || cooldown.active}
+            disabled={busy || (!body.trim() && picker.files.length === 0) || overLimit || cooldown.active}
           >
-            Post
+            {busy ? (
+              <span className="btn-spinner" aria-hidden="true" />
+            ) : (
+              "Post"
+            )}
           </button>
-          <button type="button" className="icon-btn" disabled title="Attach — coming soon" aria-label="Attach file">
-            <i className="fa fa-paperclip" aria-hidden="true" />
-          </button>
+          <MediaAttachButton picker={picker} disabled={busy} />
         </div>
         <div className="composer-meta">
           {cooldown.active ? (
@@ -105,6 +115,12 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
           )}
         </div>
       </div>
+      <MediaPreviews picker={picker} />
+      {busy && picker.files.length > 0 && (
+        <div className="composer-uploading" role="status">
+          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> Publishing media…
+        </div>
+      )}
       {error && (
         <div className="error" role="alert">
           {error}

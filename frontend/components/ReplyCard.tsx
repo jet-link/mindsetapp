@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, MouseEvent } from "react";
 import CardMenu from "@/components/CardMenu";
 import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
+import MediaCarousel from "@/components/MediaCarousel";
 import {
   REPLY_CREATED_EVENT,
   REPLY_LIKE_EVENT,
@@ -223,10 +224,14 @@ export default function ReplyCard({
         </div>
 
         <div
-          className={`body-html body-html--boxed${clickable ? " body-html--clickable" : ""}`}
+          className={`body-html--boxed${clickable ? " body-html--clickable" : ""}`}
           onClick={onBodyClick}
-          dangerouslySetInnerHTML={{ __html: reply.body }}
-        />
+        >
+          {reply.body && (
+            <div className="body-html" dangerouslySetInnerHTML={{ __html: reply.body }} />
+          )}
+          {reply.media.length > 0 && <MediaCarousel media={reply.media} />}
+        </div>
 
         <div className="actions">
           <button

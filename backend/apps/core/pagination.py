@@ -22,3 +22,10 @@ class IdCursorPagination(CursorPagination):
     page_size = 30
     ordering = '-id'
     cursor_query_param = 'cursor'
+
+
+class RepostedAtCursorPagination(CreatedAtCursorPagination):
+    """Репосты профиля: сортировка по времени самого репоста (annotate reposted_at),
+    а не по дате создания темы — чтобы свежие репосты были сверху."""
+
+    ordering = '-reposted_at'

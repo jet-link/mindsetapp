@@ -1,8 +1,12 @@
 """API v1 для тем/ответов/ленты. View только парсят запрос и зовут services."""
 from __future__ import annotations
 
+import logging
+import traceback
+
+from django.conf import settings as dj_settings
 from django.contrib.auth import get_user_model
-from django.db.models import Q, QuerySet
+from django.db.models import Max, Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
 from rest_framework import generics, permissions, status, viewsets
@@ -11,7 +15,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.pagination import FeedCursorPagination
+from apps.core.pagination import FeedCursorPagination, RepostedAtCursorPagination
 from apps.core.throttling import (
     REPLY_COOLDOWN,
     THEME_COOLDOWN,
@@ -20,23 +24,39 @@ from apps.core.throttling import (
 from apps.follows.models import Follow
 
 from . import services
-from .image_service import MindsetImageError
+from .media_service import MindsetMediaError
 from .models import (
     Reply,
     ReplyLike,
+    ReplyMedia,
     ReplyRepost,
     Theme,
     ThemeLike,
+    ThemeMedia,
     ThemeRepost,
     ThemeShare,
 )
 from .serializers import (
+    MediaSerializer,
     ProfileReplySerializer,
     ReplyCreateSerializer,
     ReplySerializer,
     ThemeCreateSerializer,
     ThemeSerializer,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _unexpected_error_response(where: str, **ctx):
+    """Логирует полный traceback и отдаёт его в detail при DEBUG, иначе общее
+    сообщение. Чтобы вместо немой HTML-500 пользователь/консоль видели причину."""
+    logger.exception('Unexpected error in %s (%s)', where, ctx)
+    if dj_settings.DEBUG:
+        detail = f'{where}: {traceback.format_exc()}'
+    else:
+        detail = 'Server error. Please try again.'
+    return Response({'detail': detail}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 User = get_user_model()
 
@@ -93,7 +113,7 @@ def _theme_queryset() -> QuerySet[Theme]:
     return (
         Theme.objects.filter(is_deleted=False)
         .select_related('author')
-        .prefetch_related('images', 'hashtags')
+        .prefetch_related('media', 'hashtags')
     )
 
 
@@ -164,16 +184,23 @@ class ThemeViewSet(viewsets.GenericViewSet):
             return _cooldown_response(wait, 'posting')
         ser = ThemeCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        images = request.FILES.getlist('images')
+        media = request.FILES.getlist('media')
+        if not ser.validated_data['body'].strip() and not media:
+            return Response(
+                {'detail': 'Add some text or media.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             theme = services.create_theme(
-                author=request.user, body=ser.validated_data['body'], images=images
+                author=request.user, body=ser.validated_data['body'], media=media
             )
-        except MindsetImageError as e:
+            theme = _theme_queryset().get(pk=theme.pk)
+            out = ThemeSerializer(theme, context=_viewer_context(request, [theme]))
+            return Response(out.data, status=status.HTTP_201_CREATED)
+        except MindsetMediaError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        theme = _theme_queryset().get(pk=theme.pk)
-        out = ThemeSerializer(theme, context=_viewer_context(request, [theme]))
-        return Response(out.data, status=status.HTTP_201_CREATED)
+        except Exception:
+            return _unexpected_error_response('theme_create', media_count=len(media))
 
     def retrieve(self, request, pk=None):
         """Тред: тема + первый уровень ответов (children грузим отдельно)."""
@@ -181,6 +208,7 @@ class ThemeViewSet(viewsets.GenericViewSet):
         replies = list(
             theme.replies.filter(is_deleted=False, parent__isnull=True)
             .select_related('author')
+            .prefetch_related('media')
             .order_by('-created_at')
         )
         theme_data = ThemeSerializer(theme, context=_viewer_context(request, [theme])).data
@@ -247,6 +275,12 @@ class ThemeViewSet(viewsets.GenericViewSet):
         theme = self.get_object()
         ser = ReplyCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        reply_media = request.FILES.getlist('media')
+        if not ser.validated_data['body'].strip() and not reply_media:
+            return Response(
+                {'detail': 'Add some text or media.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         parent = None
         parent_id = ser.validated_data.get('parent_id')
         if parent_id:
@@ -257,11 +291,13 @@ class ThemeViewSet(viewsets.GenericViewSet):
                 author=request.user,
                 body=ser.validated_data['body'],
                 parent=parent,
-                images=request.FILES.getlist('images'),
+                media=reply_media,
             )
-        except MindsetImageError as e:
+            out = ReplySerializer(reply, context=_reply_viewer_context(request, [reply]))
+        except MindsetMediaError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        out = ReplySerializer(reply, context=_reply_viewer_context(request, [reply]))
+        except Exception:
+            return _unexpected_error_response('reply_create', media_count=len(reply_media))
         theme.refresh_from_db(fields=['replies_count'])
         payload = dict(out.data)
         payload['theme_replies_count'] = theme.replies_count
@@ -299,13 +335,14 @@ class ReplyDetailView(APIView):
 
     def get(self, request, pk):
         reply = get_object_or_404(
-            Reply.objects.select_related('author', 'theme'),
+            Reply.objects.select_related('author', 'theme').prefetch_related('media'),
             pk=pk,
             is_deleted=False,
         )
         children = list(
             reply.children.filter(is_deleted=False)
             .select_related('author')
+            .prefetch_related('media')
             .order_by('-created_at')
         )
         reply_data = ReplySerializer(
@@ -361,13 +398,25 @@ class UserThemesView(generics.ListAPIView):
 
 
 class UserRepostsView(generics.ListAPIView):
-    """GET /users/{username}/reposts/ — темы, которые пользователь репостнул."""
+    """GET /users/{username}/reposts/ — темы, которые пользователь репостнул.
+
+    Сортировка по времени репоста (reposted_at), а не по дате темы:
+    свежие репосты — сверху."""
 
     serializer_class = ThemeSerializer
+    pagination_class = RepostedAtCursorPagination
 
     def get_queryset(self):
         user = get_object_or_404(User, username=self.kwargs['username'])
-        return _theme_queryset().filter(reposts__user=user)
+        return (
+            _theme_queryset()
+            .filter(reposts__user=user)
+            .annotate(
+                reposted_at=Max(
+                    'reposts__created_at', filter=Q(reposts__user=user)
+                )
+            )
+        )
 
     def get_serializer_context(self):
         page = getattr(self.paginator, 'page', None)
@@ -378,6 +427,19 @@ class UserRepostsView(generics.ListAPIView):
 def _profile_reply_context(request, replies: list[Reply]) -> dict:
     ctx = {**_reply_viewer_context(request, replies)}
     themes = [r.theme for r in replies]
+    parent_ids = [r.parent_id for r in replies if r.parent_id]
+    if request.user.is_authenticated and parent_ids:
+        ctx['parent_liked_ids'] = set(
+            ReplyLike.objects.filter(user=request.user, reply_id__in=parent_ids)
+            .values_list('reply_id', flat=True)
+        )
+        ctx['parent_reposted_ids'] = set(
+            ReplyRepost.objects.filter(user=request.user, reply_id__in=parent_ids)
+            .values_list('reply_id', flat=True)
+        )
+    else:
+        ctx['parent_liked_ids'] = set()
+        ctx['parent_reposted_ids'] = set()
     if not request.user.is_authenticated or not themes:
         ctx['theme_liked_ids'] = set()
         ctx['theme_reposted_ids'] = set()
@@ -409,8 +471,8 @@ class UserRepliesView(generics.ListAPIView):
         return (
             Reply.objects
             .filter(author=user, is_deleted=False, theme__is_deleted=False)
-            .select_related('author', 'theme', 'theme__author')
-            .prefetch_related('theme__images', 'theme__hashtags')
+            .select_related('author', 'theme', 'theme__author', 'parent', 'parent__author')
+            .prefetch_related('media', 'theme__media', 'theme__hashtags', 'parent__media')
             .order_by('-created_at')
         )
 
@@ -423,16 +485,65 @@ class UserRepliesView(generics.ListAPIView):
         }
 
 
-class UserMediaView(generics.ListAPIView):
-    """GET /users/{username}/media/ — темы пользователя с картинками."""
+class UserMediaView(APIView):
+    """GET /users/{username}/media/ — все изображения пользователя из тем И
+    ответов, единой сеткой. Самые свежие сверху, дубликаты (один и тот же файл)
+    не повторяются. Offset-курсор, т.к. поток объединён из двух таблиц."""
 
-    serializer_class = ThemeSerializer
+    PAGE_SIZE = 30
 
-    def get_queryset(self):
-        user = get_object_or_404(User, username=self.kwargs['username'])
-        return _theme_queryset().filter(author=user, images__isnull=False).distinct()
+    def _offset(self, request) -> int:
+        try:
+            return max(0, int(request.query_params.get('cursor')))
+        except (TypeError, ValueError):
+            return 0
 
-    def get_serializer_context(self):
-        page = getattr(self.paginator, 'page', None)
-        themes = list(page) if page is not None else []
-        return {**super().get_serializer_context(), **_viewer_context(self.request, themes)}
+    def get(self, request, username):
+        user = get_object_or_404(User, username=username)
+
+        # Лёгкая выборка только (pk, uploaded_at) из обеих таблиц.
+        theme_rows = ThemeMedia.objects.filter(
+            theme__author=user, theme__is_deleted=False,
+        ).values_list('pk', 'uploaded_at')
+        reply_rows = ReplyMedia.objects.filter(
+            reply__author=user,
+            reply__is_deleted=False,
+            reply__theme__is_deleted=False,
+        ).values_list('pk', 'uploaded_at')
+
+        combined = [('t', pk, ts) for pk, ts in theme_rows]
+        combined += [('r', pk, ts) for pk, ts in reply_rows]
+        # Самые свежие сверху; pk — стабильный тай-брейк.
+        combined.sort(key=lambda x: (x[2], x[1]), reverse=True)
+
+        offset = self._offset(request)
+        page_rows = combined[offset:offset + self.PAGE_SIZE]
+
+        t_ids = [pk for src, pk, _ in page_rows if src == 't']
+        r_ids = [pk for src, pk, _ in page_rows if src == 'r']
+        t_map = {m.pk: m for m in ThemeMedia.objects.filter(pk__in=t_ids)}
+        r_map = {m.pk: m for m in ReplyMedia.objects.filter(pk__in=r_ids)}
+
+        results = []
+        seen_urls: set[str] = set()
+        for src, pk, _ts in page_rows:
+            obj = (t_map if src == 't' else r_map).get(pk)
+            if obj is None:
+                continue
+            data = MediaSerializer(obj, context={'request': request}).data
+            # Дедуп по реальному файлу: один и тот же url в сетке не повторяем.
+            url = data.get('url') or ''
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+            data['key'] = f'{src}{pk}'
+            results.append(data)
+
+        next_url = None
+        if offset + self.PAGE_SIZE < len(combined):
+            next_offset = offset + self.PAGE_SIZE
+            next_url = request.build_absolute_uri(
+                f'{request.path}?cursor={next_offset}'
+            )
+        return Response({'next': next_url, 'previous': None, 'results': results})

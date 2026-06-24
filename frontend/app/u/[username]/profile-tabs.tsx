@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname } from "next/navigation";
 import ReplyCard from "@/components/ReplyCard";
 import ListExitWrap from "@/components/ListExitWrap";
+import ProfileMediaGrid from "@/components/ProfileMediaGrid";
 import ThemeCard from "@/components/ThemeCard";
 import {
   AUTH_EVENT,
@@ -23,6 +24,7 @@ import {
   Theme,
   ThemeLikeDetail,
   ThemeRepostDetail,
+  MediaItem,
   ProfileReply,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
@@ -57,7 +59,20 @@ const ALL_TABS: ProfileTab[] = PROFILE_TABS;
 type TabSlice = ProfileSlice;
 
 function emptyTabSlice(): TabSlice {
-  return { themes: [], replies: [], nextCursor: null, loaded: false };
+  return { themes: [], replies: [], media: [], nextCursor: null, loaded: false };
+}
+
+/** Склейка страниц медиа без дублей (по файлу/ключу). Порядок сохраняем. */
+function dedupeMedia(items: MediaItem[]): MediaItem[] {
+  const seen = new Set<string>();
+  const out: MediaItem[] = [];
+  for (const m of items) {
+    const k = m.url || m.key || String(m.id);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(m);
+  }
+  return out;
 }
 
 function emptySlices(): Record<ProfileTab, TabSlice> {
@@ -122,12 +137,14 @@ function prependToRepostsSlice(
   theme: Theme,
 ): Record<ProfileTab, TabSlice> {
   const repostsSlice = slices.reposts;
+  // Не «достраиваем» незагруженный срез: пусть подтянет свежее с сервера.
+  if (!repostsSlice.loaded) return slices;
   const themes = repostsSlice.themes.some((t) => t.id === theme.id)
     ? repostsSlice.themes.map((t) => (t.id === theme.id ? { ...t, ...theme } : t))
     : [theme, ...repostsSlice.themes];
   return {
     ...slices,
-    reposts: { ...repostsSlice, themes, loaded: true },
+    reposts: { ...repostsSlice, themes },
   };
 }
 
@@ -136,13 +153,13 @@ function prependThemeToSlice(
   theme: Theme,
 ): Record<ProfileTab, TabSlice> {
   const themesSlice = slices.themes;
+  if (!themesSlice.loaded) return slices;
   if (themesSlice.themes.some((t) => t.id === theme.id)) return slices;
   return {
     ...slices,
     themes: {
       ...themesSlice,
       themes: [theme, ...themesSlice.themes],
-      loaded: true,
     },
   };
 }
@@ -152,13 +169,13 @@ function prependReplyToSlice(
   profileReply: ProfileReply,
 ): Record<ProfileTab, TabSlice> {
   const repliesSlice = slices.replies;
+  if (!repliesSlice.loaded) return slices;
   if (repliesSlice.replies.some((r) => r.id === profileReply.id)) return slices;
   return {
     ...slices,
     replies: {
       ...repliesSlice,
       replies: [profileReply, ...repliesSlice.replies],
-      loaded: true,
     },
   };
 }
@@ -506,6 +523,7 @@ export default function ProfileTabs({
               replies: {
                 themes: [],
                 replies: cursor ? [...slice.replies, ...page.results] : page.results,
+                media: [],
                 nextCursor,
                 loaded: true,
               },
@@ -514,12 +532,30 @@ export default function ProfileTabs({
           return;
         }
 
-        const fetcher =
-          activeTab === "reposts"
-            ? getUserReposts
-            : activeTab === "media"
-              ? getUserMedia
-              : getUserThemes;
+        if (activeTab === "media") {
+          const page = await getUserMedia(username, cursor);
+          const nextCursor = page.next
+            ? new URL(page.next, "http://x").searchParams.get("cursor")
+            : null;
+          setSlices((prev) => {
+            const slice = prev.media;
+            return {
+              ...prev,
+              media: {
+                themes: [],
+                replies: [],
+                media: cursor
+                  ? dedupeMedia([...slice.media, ...page.results])
+                  : dedupeMedia(page.results),
+                nextCursor,
+                loaded: true,
+              },
+            };
+          });
+          return;
+        }
+
+        const fetcher = activeTab === "reposts" ? getUserReposts : getUserThemes;
         const page = await fetcher(username, cursor);
         const nextCursor = page.next
           ? new URL(page.next, "http://x").searchParams.get("cursor")
@@ -531,6 +567,7 @@ export default function ProfileTabs({
             [activeTab]: {
               themes: cursor ? [...slice.themes, ...page.results] : page.results,
               replies: [],
+              media: [],
               nextCursor,
               loaded: true,
             },
@@ -720,17 +757,15 @@ export default function ProfileTabs({
               is_reposted: true,
               reposts_count,
             });
+          } else if (next.reposts.loaded) {
+            // Темы нет в кэше — помечаем срез репостов на дозагрузку.
+            next = { ...next, reposts: { ...next.reposts, loaded: false } };
           }
         }
         return next;
       });
       if (reposted && isOwnProfile && !hadRepost) {
-        const source =
-          findThemeInSlices(slicesRef.current, themeId) ??
-          findThemeInAllCaches(themeId);
-        if (source) {
-          setTabCounts((c) => ({ ...c, reposts: c.reposts + 1 }));
-        }
+        setTabCounts((c) => ({ ...c, reposts: c.reposts + 1 }));
       }
     };
     const onThemeCreated = (e: Event) => {
@@ -753,17 +788,14 @@ export default function ProfileTabs({
         if (username !== getStoredUsername() || reply.author.username !== username) {
           return next;
         }
-        const profileReply =
-          buildProfileReplyFromCreated(detail) ??
-          (() => {
-            const theme = findThemeInSlices(next, themeId) ?? findThemeInAllCaches(themeId);
-            if (!theme) return null;
-            return {
-              ...reply,
-              theme: { ...theme, replies_count: themeRepliesCount },
-            } satisfies ProfileReply;
-          })();
-        if (!profileReply) return next;
+        const profileReply = buildProfileReplyFromCreated(detail);
+        if (!profileReply) {
+          // Не собрали корректный элемент (нет темы/родителя в кэше) —
+          // помечаем срез на дозагрузку, чтобы открытие вкладки показало свежее.
+          return next.replies.loaded
+            ? { ...next, replies: { ...next.replies, loaded: false } }
+            : next;
+        }
         return prependReplyToSlice(next, profileReply);
       });
       if (username === getStoredUsername() && reply.author.username === username) {
@@ -878,7 +910,11 @@ export default function ProfileTabs({
 
   useRestoreAnchor(
     listKey,
-    activeSlice.loaded && !activeLoading && (activeSlice.themes.length > 0 || activeSlice.replies.length > 0),
+    activeSlice.loaded &&
+      !activeLoading &&
+      (activeSlice.themes.length > 0 ||
+        activeSlice.replies.length > 0 ||
+        activeSlice.media.length > 0),
   );
 
   const sentinelRef = useInfiniteScroll({
@@ -926,7 +962,12 @@ export default function ProfileTabs({
           const slice = slices[tabId];
           const isActive = tab === tabId;
           const isLoading = loadingTab === tabId;
-          const items = tabId === "replies" ? slice.replies : slice.themes;
+          const items =
+            tabId === "replies"
+              ? slice.replies
+              : tabId === "media"
+                ? slice.media
+                : slice.themes;
           const showPanel = isActive || slice.loaded;
 
           if (!showPanel) return null;
@@ -953,12 +994,20 @@ export default function ProfileTabs({
                       >
                         <div className="profile-reply-thread">
                           <div className="thread-chain">
-                            <ThemeCard
-                              theme={r.theme}
-                              threadLineBelow
-                              {...themeRepostProps}
-                              onDeleted={() => removeThemeFromSlices(r.theme.id)}
-                            />
+                            {r.parent ? (
+                              <ReplyCard
+                                reply={r.parent}
+                                threadLineBelow
+                                clickable
+                              />
+                            ) : (
+                              <ThemeCard
+                                theme={r.theme}
+                                threadLineBelow
+                                {...themeRepostProps}
+                                onDeleted={() => removeThemeFromSlices(r.theme.id)}
+                              />
+                            )}
                             <ReplyCard
                               reply={r}
                               indented
@@ -1007,14 +1056,7 @@ export default function ProfileTabs({
                             />
                           </ListExitWrap>
                         ))
-                      : slice.themes.map((t) => (
-                          <ThemeCard
-                            key={`${tabId}-${t.id}`}
-                            theme={t}
-                            {...themeRepostProps}
-                            onDeleted={() => removeThemeFromSlices(t.id)}
-                          />
-                        ))}
+                      : <ProfileMediaGrid items={slice.media} />}
               </div>
 
               {isActive && isLoading && items.length === 0 && (

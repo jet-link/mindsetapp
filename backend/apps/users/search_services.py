@@ -233,7 +233,7 @@ def search_themes_queryset(q: str):
     qs = (
         Theme.objects.filter(is_deleted=False)
         .select_related('author')
-        .prefetch_related('images', 'hashtags')
+        .prefetch_related('media', 'hashtags')
     )
     q = (q or '').strip()
     if not q:

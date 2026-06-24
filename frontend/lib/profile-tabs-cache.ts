@@ -1,6 +1,6 @@
-import type { ProfileReply, ReplyCreatedDetail, Theme } from "@/lib/api";
+import type { MediaItem, ProfileReply, ReplyCreatedDetail, Theme } from "@/lib/api";
 import { getStoredUsername } from "@/lib/api";
-import { findThemeInAllCaches } from "@/lib/theme-cache-lookup";
+import { findReplyInAllCaches, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 
 export type ProfileTab = "themes" | "replies" | "media" | "reposts";
 
@@ -9,6 +9,7 @@ export const PROFILE_TABS: ProfileTab[] = ["themes", "replies", "media", "repost
 export type ProfileSlice = {
   themes: Theme[];
   replies: ProfileReply[];
+  media: MediaItem[];
   nextCursor: string | null;
   loaded: boolean;
 };
@@ -179,9 +180,12 @@ export function buildProfileReplyFromCreated(
   if (!username || detail.reply.author.username !== username) return null;
   const theme = findThemeInAllCaches(detail.themeId);
   if (!theme) return null;
+  const parent =
+    detail.parentId != null ? findReplyInAllCaches(detail.parentId) : null;
   return {
     ...detail.reply,
     theme: { ...theme, replies_count: detail.themeRepliesCount },
+    parent,
   };
 }
 
@@ -191,11 +195,12 @@ export function prependThemeToProfileCache(theme: Theme) {
   if (profileTabsCache.username !== username) return;
   mapCachedSlices((slice, tab) => {
     if (tab !== "themes") return slice;
+    // Незагруженный срез не «достраиваем» — он сам подтянет свежее при открытии.
+    if (!slice.loaded) return slice;
     if (slice.themes.some((t) => t.id === theme.id)) return slice;
     return {
       ...slice,
       themes: [theme, ...slice.themes],
-      loaded: true,
     };
   });
 }
@@ -206,46 +211,35 @@ export function prependReplyToProfileCache(profileReply: ProfileReply) {
   if (profileTabsCache.username !== username) return;
   mapCachedSlices((slice, tab) => {
     if (tab !== "replies") return slice;
+    if (!slice.loaded) return slice;
     if (slice.replies.some((r) => r.id === profileReply.id)) return slice;
     return {
       ...slice,
       replies: [profileReply, ...slice.replies],
-      loaded: true,
     };
   });
 }
 
-function emptyProfileSlices(): Record<ProfileTab, ProfileSlice> {
-  return {
-    themes: { themes: [], replies: [], nextCursor: null, loaded: false },
-    replies: { themes: [], replies: [], nextCursor: null, loaded: false },
-    media: { themes: [], replies: [], nextCursor: null, loaded: false },
-    reposts: { themes: [], replies: [], nextCursor: null, loaded: false },
+/** Пометить срез вкладки на дозагрузку: при следующем открытии — свежий fetch. */
+export function markProfileSliceStale(tab: ProfileTab) {
+  const username = getStoredUsername();
+  if (!username || !profileTabsCache || profileTabsCache.username !== username) return;
+  const slice = profileTabsCache.slices[tab];
+  if (!slice.loaded) return;
+  profileTabsCache = {
+    ...profileTabsCache,
+    slices: { ...profileTabsCache.slices, [tab]: { ...slice, loaded: false } },
   };
 }
 
-/** Репост с ленты/треда: темы ещё нет во вкладках профиля — добавляем в Reposts. */
+/** Репост с ленты/треда: обновляем флаги в загруженных срезах профиля.
+ * Если вкладки профиля ещё не открывались (нет кэша) — ничего не подделываем:
+ * при открытии Reposts данные подтянутся свежими с сервера. */
 export function prependRepostToProfileCache(theme: Theme) {
   const username = getStoredUsername();
-  if (!username) return;
+  if (!username || !profileTabsCache || profileTabsCache.username !== username) return;
 
   const repostedTheme = { ...theme, is_reposted: true };
-
-  if (!profileTabsCache || profileTabsCache.username !== username) {
-    const slices = emptyProfileSlices();
-    slices.reposts = {
-      themes: [repostedTheme],
-      replies: [],
-      nextCursor: null,
-      loaded: true,
-    };
-    profileTabsCache = {
-      username,
-      tab: profileTabsCache?.username === username ? profileTabsCache.tab : "themes",
-      slices,
-    };
-    return;
-  }
 
   mapCachedSlices((slice, tab) => {
     if (tab !== "reposts") {
@@ -270,9 +264,11 @@ export function prependRepostToProfileCache(theme: Theme) {
         ),
       };
     }
+    // Незагруженный срез репостов не достраиваем — подтянется свежим при открытии.
+    if (!slice.loaded) return slice;
     const themes = slice.themes.some((t) => t.id === theme.id)
       ? slice.themes.map((t) => (t.id === theme.id ? { ...t, ...repostedTheme } : t))
       : [repostedTheme, ...slice.themes];
-    return { ...slice, themes, loaded: true };
+    return { ...slice, themes };
   });
 }

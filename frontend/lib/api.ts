@@ -24,6 +24,7 @@ import {
 import {
   buildProfileReplyFromCreated,
   clearProfileTabsCache,
+  markProfileSliceStale,
   prependReplyToProfileCache,
   prependRepostToProfileCache,
   prependThemeToProfileCache,
@@ -63,16 +64,21 @@ export interface UserProfile extends UserPublic {
   is_following: boolean;
 }
 
-export interface ThemeImage {
+export type MediaKind = "image";
+
+export interface MediaItem {
   id: number;
+  kind: MediaKind;
+  sort_order: number;
+  width: number | null;
+  height: number | null;
+  orientation_kind: string;
   url: string;
   thumbnail_url: string;
   medium_url: string;
   srcset: string;
-  width: number | null;
-  height: number | null;
-  orientation_kind: string;
-  sort_order: number;
+  // Уникальный ключ через таблицы (theme/reply), приходит на вкладке Media.
+  key?: string;
 }
 
 export interface Hashtag {
@@ -87,7 +93,7 @@ export interface Theme {
   body: string;
   body_text: string;
   preview: string;
-  images: ThemeImage[];
+  media: MediaItem[];
   hashtags: Hashtag[];
   replies_count: number;
   likes_count: number;
@@ -108,6 +114,7 @@ export interface Reply {
   parent_id: number | null;
   author: UserPublic;
   body: string;
+  media: MediaItem[];
   replies_count: number;
   likes_count: number;
   reposts_count: number;
@@ -120,6 +127,9 @@ export interface Reply {
 
 export interface ProfileReply extends Reply {
   theme: Theme;
+  // Если ответ дан на другой ответ — здесь лежит родительский ответ,
+  // и фронт показывает его как контекст вместо темы.
+  parent?: Reply | null;
 }
 
 export interface CursorPage<T> {
@@ -440,11 +450,19 @@ function throwIfCooldown(data: unknown) {
   }
 }
 
-export const createTheme = async (body: string) => {
-  const data = await apiFetch<Theme | CooldownPayload>("/api/v1/themes/", {
-    method: "POST",
-    body: JSON.stringify({ body }),
-  });
+export const createTheme = async (body: string, media: File[] = []) => {
+  let data: Theme | CooldownPayload;
+  if (media.length > 0) {
+    const form = new FormData();
+    form.append("body", body);
+    for (const file of media) form.append("media", file);
+    data = await apiFetchMultipart<Theme | CooldownPayload>("/api/v1/themes/", form, "POST");
+  } else {
+    data = await apiFetch<Theme | CooldownPayload>("/api/v1/themes/", {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    });
+  }
   throwIfCooldown(data);
   return data as Theme;
 };
@@ -466,14 +484,32 @@ export interface CreateReplyResponse extends Reply {
   parent_replies_count?: number;
 }
 
-export const createReply = async (themeId: number, body: string, parentId?: number) => {
-  const data = await apiFetch<CreateReplyResponse | CooldownPayload>(
-    `/api/v1/themes/${themeId}/replies/`,
-    {
-      method: "POST",
-      body: JSON.stringify({ body, parent_id: parentId ?? null }),
-    },
-  );
+export const createReply = async (
+  themeId: number,
+  body: string,
+  parentId?: number,
+  media: File[] = [],
+) => {
+  let data: CreateReplyResponse | CooldownPayload;
+  if (media.length > 0) {
+    const form = new FormData();
+    form.append("body", body);
+    if (parentId != null) form.append("parent_id", String(parentId));
+    for (const file of media) form.append("media", file);
+    data = await apiFetchMultipart<CreateReplyResponse | CooldownPayload>(
+      `/api/v1/themes/${themeId}/replies/`,
+      form,
+      "POST",
+    );
+  } else {
+    data = await apiFetch<CreateReplyResponse | CooldownPayload>(
+      `/api/v1/themes/${themeId}/replies/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ body, parent_id: parentId ?? null }),
+      },
+    );
+  }
   throwIfCooldown(data);
   return data as CreateReplyResponse;
 };
@@ -519,7 +555,7 @@ export const getUserReplies = (username: string, cursor?: string) =>
   );
 
 export const getUserMedia = (username: string, cursor?: string) =>
-  apiFetch<CursorPage<Theme>>(
+  apiFetch<CursorPage<MediaItem>>(
     `/api/v1/users/${encodeURIComponent(username)}/media/${buildQuery({ cursor })}`,
   );
 
@@ -677,13 +713,19 @@ export const getMe = () => apiFetch<MeProfile>("/api/v1/me/");
 export const updateMeBio = (bio: string) =>
   apiFetch<MeProfile>("/api/v1/me/", { method: "PATCH", body: JSON.stringify({ bio }) });
 
-async function apiFetchMultipart<T>(path: string, formData: FormData, retry = true): Promise<T> {
+async function apiFetchMultipart<T>(
+  path: string,
+  formData: FormData,
+  method: "POST" | "PATCH" = "PATCH",
+  retry = true,
+): Promise<T> {
   if (!isServer && accessTokenExpired()) {
     await refreshAccessToken();
   }
 
   const res = await fetch(`${apiBase()}${path}`, {
-    method: "PATCH",
+    method,
+    // Content-Type не задаём вручную — браузер сам выставит boundary.
     headers: { ...authHeaders() },
     body: formData,
     cache: "no-store",
@@ -691,7 +733,7 @@ async function apiFetchMultipart<T>(path: string, formData: FormData, retry = tr
 
   if (res.status === 401 && retry && !isServer) {
     const ok = await refreshAccessToken();
-    if (ok) return apiFetchMultipart<T>(path, formData, false);
+    if (ok) return apiFetchMultipart<T>(path, formData, method, false);
     forceLogoutRedirect();
   }
 
@@ -760,7 +802,13 @@ export function emitReplyCreated(detail: ReplyCreatedDetail) {
     detail.parentRepliesCount,
   );
   const profileReply = buildProfileReplyFromCreated(detail);
-  if (profileReply) prependReplyToProfileCache(profileReply);
+  if (profileReply) {
+    prependReplyToProfileCache(profileReply);
+  } else if (detail.reply.author.username === getStoredUsername()) {
+    // Свой ответ, но кэш не позволил собрать корректный элемент —
+    // помечаем вкладку Replies на дозагрузку, чтобы показать свежее.
+    markProfileSliceStale("replies");
+  }
   applyReplyCreated(detail);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_CREATED_EVENT, { detail }));
@@ -805,6 +853,9 @@ export function emitThemeRepostChanged(detail: ThemeRepostDetail) {
         is_reposted: true,
         reposts_count: detail.reposts_count,
       });
+    } else {
+      // Тему не нашли в кэше — помечаем вкладку Reposts на дозагрузку.
+      markProfileSliceStale("reposts");
     }
   }
   applyThemeRepostChanged(detail.themeId, detail.reposted, detail.reposts_count);

@@ -79,7 +79,7 @@ export default function ProfileHead({
   async function saveBio(e?: React.FormEvent) {
     e?.preventDefault();
     if (bioCharCount(bioDraft) > BIO_LIMIT) {
-      setBioError(`Bio must be ${BIO_LIMIT} characters or fewer (line breaks do not count).`);
+      setBioError(`Bio must be ${BIO_LIMIT} characters or fewer.`);
       return;
     }
     setBioBusy(true);

@@ -74,9 +74,8 @@ THEME_BODY_MAX_LEN = 500
 
 
 def normalize_theme_body(text: str) -> str:
-    """Два и более \\n подряд → один перенос (1 символ)."""
-    text = (text or '').replace('\r\n', '\n').replace('\r', '\n')
-    return re.sub(r'\n{2,}', '\n', text)
+    """\\r\\n и \\r → \\n; каждый перенос строки = 1 символ."""
+    return (text or '').replace('\r\n', '\n').replace('\r', '\n')
 
 
 def theme_body_length(text: str) -> int:

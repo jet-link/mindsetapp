@@ -41,17 +41,12 @@ def _looks_like_html(text: str) -> bool:
 
 
 def plain_text_to_html(text: str) -> str:
-    """Один \\n → <br>, пустая строка (двойной \\n) → новый абзац <p>."""
+    """Каждый \\n → <br> (1 перенос = 1 символ в тексте)."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
     if not text.strip():
         return ''
-    paragraphs = re.split(r'\n\n+', text)
-    blocks: list[str] = []
-    for para in paragraphs:
-        lines = para.split('\n')
-        inner = '<br>'.join(escape(line) for line in lines)
-        blocks.append(f'<p>{inner}</p>')
-    return ''.join(blocks)
+    inner = '<br>'.join(escape(line) for line in text.split('\n'))
+    return f'<p>{inner}</p>'
 
 
 def _tag_url(slug: str) -> str:

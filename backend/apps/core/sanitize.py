@@ -132,7 +132,4 @@ def sanitize_and_linkify_html(fragment: str) -> str:
     t = bleach.clean(t, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
 
     t = _inject_blank_target_external(t)
-    t = re.sub(r'(<br\s*/?>\s*){3,}', '<br><br>', t, flags=re.I)
-    t = re.sub(r'(<p>\s*<br\s*/?>\s*</p>\s*){3,}', '<br><br>', t, flags=re.I)
-    t = re.sub(r'(<div>\s*<br\s*/?>\s*</div>\s*){3,}', '<br><br>', t, flags=re.I)
     return t

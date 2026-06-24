@@ -7,7 +7,7 @@ const MENTION_RE =
   /(@[A-Za-z0-9](?:[A-Za-z0-9_.+@-]{0,148}[A-Za-z0-9])?)/g;
 
 export function bioCharCount(text: string): number {
-  return text.replace(/\r\n?|\n/g, "").length;
+  return text.replace(/\r\n?/g, "\n").length;
 }
 
 export default function BioText({

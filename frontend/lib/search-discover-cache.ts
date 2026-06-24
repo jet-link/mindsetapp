@@ -88,3 +88,20 @@ export function clearRecentSearches(owner: string | null, tab: "themes" | "users
     .filter((item) => item.tab !== tab);
   writeRecentRaw(owner, items);
 }
+
+export function removeRecentSearch(
+  owner: string | null,
+  tab: "themes" | "users",
+  query: string,
+) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return;
+  const normalized = trimmed.toLowerCase();
+  const now = Date.now();
+  const items = parseRecentRaw(owner)
+    .filter((item) => now - item.at < RECENT_TTL_MS)
+    .filter(
+      (item) => !(item.tab === tab && item.query.toLowerCase() === normalized),
+    );
+  writeRecentRaw(owner, items);
+}

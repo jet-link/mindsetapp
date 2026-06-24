@@ -21,6 +21,7 @@ import {
   clearRecentSearches,
   pushRecentSearch,
   readRecentSearches,
+  removeRecentSearch,
   type RecentSearch,
 } from "@/lib/search-discover-cache";
 import { patchThemeAuthors, patchUserPublicList } from "@/lib/user-avatar-store";
@@ -299,6 +300,15 @@ export default function SearchPage() {
     setRecentSearches(readRecentSearches(owner));
   }
 
+  function removeHistoryItem(item: RecentSearch, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!authed) return;
+    const owner = ownerRef.current;
+    removeRecentSearch(owner, item.tab, item.query);
+    setRecentSearches(readRecentSearches(owner));
+  }
+
   function recordResultClick(activeTab: SearchTab) {
     const q = queryRef.current.trim();
     if (q.length < MIN_QUERY_LEN) return;
@@ -390,7 +400,7 @@ export default function SearchPage() {
                 <div className="discover-search__panel">
                   <ul className="discover-search__list">
                     {recentItems.map((item) => (
-                      <li key={`recent-${item.tab}-${item.query}`}>
+                      <li key={`recent-${item.tab}-${item.query}`} className="discover-search__row">
                         <button
                           type="button"
                           className="discover-search__item"
@@ -399,6 +409,16 @@ export default function SearchPage() {
                           <i className="fa fa-clock-o" aria-hidden="true" />
                           <span>{item.query}</span>
                         </button>
+                        {authed && (
+                          <button
+                            type="button"
+                            className="discover-search__remove"
+                            aria-label={`Remove "${item.query}" from history`}
+                            onClick={(e) => removeHistoryItem(item, e)}
+                          >
+                            <i className="fa fa-times" aria-hidden="true" />
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>

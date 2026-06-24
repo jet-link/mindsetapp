@@ -30,8 +30,8 @@ def _short_register_errors(errors: dict) -> dict:
     if errors.get('email'):
         msg = str(errors['email'][0]).lower()
         out['email'] = (
-            'Email address already in use'
-            if any(k in msg for k in ('already', 'exist', 'unique', 'in use'))
+            'Email address is already registered!'
+            if any(k in msg for k in ('already', 'exist', 'unique', 'in use', 'registered'))
             else 'Email incorrectly'
         )
 

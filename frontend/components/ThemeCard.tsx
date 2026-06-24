@@ -7,6 +7,7 @@ import CardMenu from "@/components/CardMenu";
 import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
 import MediaCarousel from "@/components/MediaCarousel";
+import BodyHtml from "@/components/BodyHtml";
 import {
   REPLY_CREATED_EVENT,
   ReplyCreatedDetail,
@@ -251,9 +252,7 @@ export default function ThemeCard({
           className={`body-html--boxed${clickable ? " body-html--clickable" : ""}`}
           onClick={onBodyClick}
         >
-          {theme.body && (
-            <div className="body-html" dangerouslySetInnerHTML={{ __html: theme.body }} />
-          )}
+          {theme.body && <BodyHtml html={theme.body} />}
           {theme.media.length > 0 && <MediaCarousel media={theme.media} />}
         </div>
 

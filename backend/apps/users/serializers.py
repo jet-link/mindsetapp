@@ -99,6 +99,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'password')
 
+    def validate_email(self, value: str) -> str:
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('Email address is already registered!')
+        return value
+
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
 
@@ -118,11 +123,10 @@ class MeSerializer(serializers.ModelSerializer):
         )
 
     def validate_bio(self, value: str) -> str:
-        value = value or ''
-        plain = value.replace('\r\n', '').replace('\r', '').replace('\n', '')
-        if len(plain) > 150:
+        value = (value or '').replace('\r\n', '\n').replace('\r', '\n')
+        if len(value) > 150:
             raise serializers.ValidationError(
-                'Bio must be 150 characters or fewer (line breaks do not count).'
+                'Bio must be 150 characters or fewer.'
             )
         return value
 

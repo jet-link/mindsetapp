@@ -52,27 +52,26 @@ def create_theme(*, author, body: str, media: Sequence = ()) -> Theme:
     if files:
         validate_theme_media(files)
 
-    with transaction.atomic():
-        html = render_body(body)
-        theme = Theme.objects.create(
-            author=author,
-            body=html,
-            body_text=html_to_plain_text(html),
-        )
-        _sync_hashtags(theme, body)
-
-    # Тяжёлую обработку медиа держим ВНЕ транзакции (CPU/IO не блокируют БД).
-    if files:
-        try:
-            attach_theme_media(theme, files)
-        except MindsetMediaError:
-            theme.delete()
-            raise
-        except Exception:
-            theme.delete()
-            logger.exception('Theme media processing failed (theme would-be %s)', theme.pk)
-            raise MindsetMediaError('Failed to process media. Please try again.')
-    return theme
+    # Тема и все её картинки создаются атомарно: если обработка/запись любой
+    # картинки упадёт (или воркер умрёт на полпути), откатывается ВСЁ — не
+    # остаётся ни пустой темы, ни части картинок.
+    try:
+        with transaction.atomic():
+            html = render_body(body)
+            theme = Theme.objects.create(
+                author=author,
+                body=html,
+                body_text=html_to_plain_text(html),
+            )
+            _sync_hashtags(theme, body)
+            if files:
+                attach_theme_media(theme, files)
+        return theme
+    except MindsetMediaError:
+        raise
+    except Exception:
+        logger.exception('Theme create failed (media_count=%s)', len(files))
+        raise MindsetMediaError('Failed to process media. Please try again.')
 
 
 @transaction.atomic
@@ -91,24 +90,22 @@ def create_reply(*, theme: Theme, author, body: str, parent: Reply | None = None
     if files:
         validate_reply_media(files)
 
-    with transaction.atomic():
-        reply = Reply.objects.create(
-            theme=theme,
-            author=author,
-            parent=parent,
-            body=render_body(body),
-        )
-
-    if files:
-        try:
-            attach_reply_media(reply, files)
-        except MindsetMediaError:
-            reply.delete()
-            raise
-        except Exception:
-            reply.delete()
-            logger.exception('Reply media processing failed (reply %s)', reply.pk)
-            raise MindsetMediaError('Failed to process media. Please try again.')
+    # Ответ и его картинки — атомарно (см. create_theme).
+    try:
+        with transaction.atomic():
+            reply = Reply.objects.create(
+                theme=theme,
+                author=author,
+                parent=parent,
+                body=render_body(body),
+            )
+            if files:
+                attach_reply_media(reply, files)
+    except MindsetMediaError:
+        raise
+    except Exception:
+        logger.exception('Reply create failed (media_count=%s)', len(files))
+        raise MindsetMediaError('Failed to process media. Please try again.')
 
     notify(recipient=theme.author, actor=author, verb='reply', theme=theme, reply=reply)
     if parent is not None and parent.author_id != theme.author_id:

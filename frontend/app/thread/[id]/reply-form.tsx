@@ -11,6 +11,7 @@ import {
 import { createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
 import { REPLY_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
 import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
+import { mediaLimitExceededMessage } from "@/lib/media-limit";
 import {
   THEME_BODY_LIMIT,
   normalizeThemeBody,
@@ -31,7 +32,7 @@ export default function ReplyForm({
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const cooldown = useCooldown("reply");
-  const picker = useMediaPicker(5);
+  const picker = useMediaPicker(5, "reply");
 
   const chars = themeCharCount(body);
   const overLimit = chars > THEME_BODY_LIMIT;
@@ -63,6 +64,10 @@ export default function ReplyForm({
     const normalized = normalizeThemeBody(body);
     const hasMedia = picker.files.length > 0;
     if ((!normalized.trim() && !hasMedia) || themeCharCount(normalized) > THEME_BODY_LIMIT) return;
+    if (picker.files.length > picker.max) {
+      setError(mediaLimitExceededMessage("reply", picker.files.length, picker.max));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -109,7 +114,7 @@ export default function ReplyForm({
           <button
             className="btn"
             type="submit"
-            disabled={busy || (!body.trim() && picker.files.length === 0) || overLimit || cooldown.active}
+            disabled={busy || (!body.trim() && picker.files.length === 0) || overLimit || picker.overLimit || cooldown.active}
           >
             {busy ? <span className="btn-spinner" aria-hidden="true" /> : "Reply"}
           </button>

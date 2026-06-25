@@ -112,24 +112,29 @@ def process_image_bytes(raw: bytes, content_type: str, original_name: str, item_
     _validate_bytes(raw, content_type, max_bytes)
     img = _open_image(io.BytesIO(raw))
 
-    large_data, large_w, large_h = _save_webp(img, SIZE_LARGE)
-    large_file = ContentFile(
-        large_data, name=_unique_storage_rel_path(item_id, 'large', original_name, raw)
-    )
+    try:
+        large_data, large_w, large_h = _save_webp(img, SIZE_LARGE)
+        large_file = ContentFile(
+            large_data, name=_unique_storage_rel_path(item_id, 'large', original_name, raw)
+        )
 
-    medium_data, _, _ = _save_webp(
-        img, SIZE_MEDIUM, quality=WEBP_QUALITY_PREVIEW, resample=Image.Resampling.BILINEAR
-    )
-    medium_file = ContentFile(
-        medium_data, name=_unique_storage_rel_path(item_id, 'medium', original_name, raw)
-    )
+        medium_data, _, _ = _save_webp(
+            img, SIZE_MEDIUM, quality=WEBP_QUALITY_PREVIEW, resample=Image.Resampling.BILINEAR
+        )
+        medium_file = ContentFile(
+            medium_data, name=_unique_storage_rel_path(item_id, 'medium', original_name, raw)
+        )
 
-    thumb_data, _, _ = _save_webp(
-        img, SIZE_THUMBNAIL, quality=WEBP_QUALITY_PREVIEW, resample=Image.Resampling.BILINEAR
-    )
-    thumb_file = ContentFile(
-        thumb_data, name=_unique_storage_rel_path(item_id, 'thumbnails', original_name, raw)
-    )
+        thumb_data, _, _ = _save_webp(
+            img, SIZE_THUMBNAIL, quality=WEBP_QUALITY_PREVIEW, resample=Image.Resampling.BILINEAR
+        )
+        thumb_file = ContentFile(
+            thumb_data, name=_unique_storage_rel_path(item_id, 'thumbnails', original_name, raw)
+        )
+    finally:
+        # Освобождаем декодированный битмап как можно раньше: при загрузке
+        # нескольких крупных фото параллельно это резко снижает пик памяти.
+        img.close()
 
     return {
         'image': large_file,

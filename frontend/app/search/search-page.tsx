@@ -39,7 +39,17 @@ const DEBOUNCE_MS = 200;
 const MIN_QUERY_LEN = 2;
 
 function cacheKey(tab: SearchTab, q: string) {
-  return `${tab}:${q.toLowerCase()}`;
+  const normalized = tab === "users" ? normalizeUserSearchQuery(q) : q.trim();
+  return `${tab}:${normalized.toLowerCase()}`;
+}
+
+function normalizeUserSearchQuery(q: string): string {
+  return q.trim().replace(/^@+/, "");
+}
+
+function effectiveSearchQuery(tab: SearchTab, q: string): string {
+  const trimmed = q.trim();
+  return tab === "users" ? normalizeUserSearchQuery(trimmed) : trimmed;
 }
 
 function parseTab(value: string | null): SearchTab {
@@ -157,9 +167,10 @@ export default function SearchPage() {
   const runSearch = useCallback(
     async (q: string, activeTab: SearchTab, cursor?: string) => {
       const isLoadMore = !!cursor;
+      const searchQ = effectiveSearchQuery(activeTab, q);
       if (!isLoadMore) abortRef.current?.abort();
 
-      if (!q || q.length < MIN_QUERY_LEN) {
+      if (!searchQ || searchQ.length < MIN_QUERY_LEN) {
         if (!isLoadMore) {
           setThemeResults([]);
           setUserResults([]);
@@ -172,7 +183,7 @@ export default function SearchPage() {
         return;
       }
 
-      const key = cacheKey(activeTab, q);
+      const key = cacheKey(activeTab, searchQ);
       if (!isLoadMore) {
         const hasCache = applyCache(key);
         if (hasCache) {
@@ -198,7 +209,7 @@ export default function SearchPage() {
 
       try {
         if (activeTab === "themes") {
-          const page = await searchThemes(q, cursor, controller.signal);
+          const page = await searchThemes(searchQ, cursor, controller.signal);
           if (requestId !== requestIdRef.current) return;
           setThemeResults((prev) =>
             isLoadMore ? [...prev, ...page.results] : page.results,
@@ -212,7 +223,7 @@ export default function SearchPage() {
             });
           }
         } else {
-          const page = await searchUsers(q, cursor, controller.signal);
+          const page = await searchUsers(searchQ, cursor, controller.signal);
           if (requestId !== requestIdRef.current) return;
           setUserResults((prev) =>
             isLoadMore ? [...prev, ...page.results] : page.results,
@@ -263,9 +274,14 @@ export default function SearchPage() {
   const showDiscover = !query.trim();
   const activeResults = tab === "themes" ? themeResults : userResults;
   const activeNextCursor = tab === "themes" ? themeNextCursor : userNextCursor;
-  const queryTooShort = query.trim().length > 0 && query.trim().length < MIN_QUERY_LEN;
+  const normalizedQuery = effectiveSearchQuery(tab, query);
+  const queryTooShort = normalizedQuery.length > 0 && normalizedQuery.length < MIN_QUERY_LEN;
   const showEmpty =
-    searched && !fetching && !error && query.trim().length >= MIN_QUERY_LEN && activeResults.length === 0;
+    searched &&
+    !fetching &&
+    !error &&
+    normalizedQuery.length >= MIN_QUERY_LEN &&
+    activeResults.length === 0;
   const resultsPanelId = tab === "themes" ? themesPanelId : usersPanelId;
   const listKey = `/search?tab=${tab}${query.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`;
 
@@ -321,7 +337,7 @@ export default function SearchPage() {
   const showRecentSection = showDiscover && (authed || recentItems.length > 0);
 
   const searchLabel =
-    tab === "themes" ? "Search themes or hashtags" : "Search users";
+    tab === "themes" ? "Search themes or hashtags" : "Search users or @username";
 
   return (
     <main className={`search-page${showDiscover ? " search-page--discover" : ""}`}>
@@ -367,7 +383,7 @@ export default function SearchPage() {
           type="search"
           enterKeyHint="search"
           placeholder={
-            tab === "themes" ? "Search themes or #hashtags…" : "Search users…"
+            tab === "themes" ? "Search themes or #hashtags…" : "Search users or @username…"
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}

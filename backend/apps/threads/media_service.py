@@ -64,7 +64,13 @@ def _validate(files: Sequence, *, limit: int) -> list[tuple[object, str, str, st
     Возвращает [(file, kind, content_type, name)]."""
     file_list = [f for f in files if f]
     if len(file_list) > limit:
-        raise MindsetMediaError(f'You can attach at most {limit} files.')
+        excess = len(file_list) - limit
+        kind = 'theme' if limit == MAX_THEME_MEDIA else 'reply'
+        noun = 'image' if excess == 1 else 'images'
+        raise MindsetMediaError(
+            f'You have exceeded the image limit for this {kind}. '
+            f'Please remove {excess} {noun}.'
+        )
 
     out: list[tuple[object, str, str, str]] = []
     for f in file_list:

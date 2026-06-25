@@ -1556,7 +1556,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   bottom: calc(-1 * (2 * var(--thread-card-py) - var(--thread-gap)));
   width: 2.5px;
   margin-left: -0.5px;
-  background: #000000;
+  background: #bababa;
   pointer-events: none;
   /* border-radius: 10px; */
 }
@@ -1590,7 +1590,7 @@ textarea:focus { outline: 2px solid #b9b9b9; }
   bottom: calc(-1 * var(--thread-gap));
   width: 2.5px;
   margin-left: -0.5px;
-  background: #000000;
+  background: #bababa;
   pointer-events: none;
   /* border-radius: 10px; */
 }
@@ -2185,18 +2185,49 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 }
 .media-picker__previews {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 5px;
   margin-top: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+/* Больше лимита для одной строки (5) — горизонтальный скролл, без переноса
+   и без выхода за пределы контейнера. */
+.media-picker__previews--scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 10px;
 }
 .media-picker__item {
   position: relative;
+  flex: 0 0 84px;
   width: 84px;
   height: 84px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
+  /* Пропускаем отрисовку превью за пределами видимой области скролла —
+     иначе много крупных фото подвешивают перерисовку (особенно при зуме). */
+  content-visibility: auto;
+  contain-intrinsic-size: 84px 84px;
+  transition:
+    opacity var(--media-remove-anim, 200ms) ease,
+    transform var(--media-remove-anim, 200ms) ease,
+    flex-basis var(--media-remove-anim, 200ms) ease,
+    width var(--media-remove-anim, 200ms) ease,
+    margin-left var(--media-remove-anim, 200ms) ease;
+}
+.media-picker__item--removing {
+  opacity: 0;
+  transform: scale(0.82);
+  flex-basis: 0;
+  width: 0;
+  margin-left: -8px;
+  pointer-events: none;
 }
 .media-picker__item img {
   width: 100%;

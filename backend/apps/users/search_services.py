@@ -53,6 +53,8 @@ def normalize_search_query(tab: str, query: str) -> str:
     q = re.sub(r'\s+', ' ', q)
     if tab == 'themes' and q.startswith('#'):
         q = q.lstrip('#').strip()
+    if tab == 'users' and q.startswith('@'):
+        q = q.lstrip('@').strip()
     if len(q) > 128:
         q = q[:128]
     return q
@@ -280,6 +282,8 @@ def search_themes_queryset(q: str):
 def search_users_queryset(q: str, *, username_only: bool = False):
     """Users search с ранжированием по релевантности."""
     q = (q or '').strip()
+    if q.startswith('@'):
+        q = q.lstrip('@').strip()
     if not q:
         return User.objects.none()
 

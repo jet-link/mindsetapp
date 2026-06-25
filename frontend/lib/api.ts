@@ -145,6 +145,18 @@ function apiBase(): string {
   return isServer ? process.env.API_ORIGIN ?? "http://127.0.0.1:8000" : "";
 }
 
+// Multipart-загрузки (фото) в браузере шлём НАПРЯМУЮ в Django, минуя rewrite-
+// прокси Next.js: его dev-прокси буферизует/обрезает крупные тела запроса
+// (большой upload приходит в Django усечённым и с задержкой ~30с → 500).
+// В проде стоит нормальный reverse-proxy, поэтому по умолчанию same-origin.
+function multipartUploadBase(): string {
+  if (isServer) return process.env.API_ORIGIN ?? "http://127.0.0.1:8000";
+  const explicit = process.env.NEXT_PUBLIC_API_ORIGIN;
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV !== "production") return "http://127.0.0.1:8000";
+  return "";
+}
+
 // --- Хранилище токенов: "Remember me" ---
 // remember=true  -> localStorage  (сессия живёт после перезапуска браузера)
 // remember=false -> sessionStorage (очищается при закрытии вкладки/браузера)
@@ -723,7 +735,7 @@ async function apiFetchMultipart<T>(
     await refreshAccessToken();
   }
 
-  const res = await fetch(`${apiBase()}${path}`, {
+  const res = await fetch(`${multipartUploadBase()}${path}`, {
     method,
     // Content-Type не задаём вручную — браузер сам выставит boundary.
     headers: { ...authHeaders() },

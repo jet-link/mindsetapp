@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePageScrollLock } from "@/lib/body-scroll-lock";
 
 const OTHER_LIMIT = 500;
 
@@ -36,18 +37,11 @@ export default function ReportContentModal({
   const canSubmit =
     (reason !== null || other.trim().length > 0) && !otherOverLimit;
 
+  usePageScrollLock(open);
+
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) {

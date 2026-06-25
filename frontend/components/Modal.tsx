@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { usePageScrollLock } from "@/lib/body-scroll-lock";
 
 export default function Modal({
   open,
@@ -17,14 +18,7 @@ export default function Modal({
   ariaLabel: string;
   overlayVariant?: "default" | "lightbox";
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  usePageScrollLock(open);
 
   if (!open) return null;
 

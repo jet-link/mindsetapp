@@ -11,6 +11,7 @@ import {
   updateMeAvatar,
   updateMeBio,
 } from "@/lib/api";
+import { usePageScrollLock } from "@/lib/body-scroll-lock";
 
 const BIO_LIMIT = 150;
 
@@ -47,23 +48,7 @@ export default function ProfileHead({
     setAvatarUrl(initialAvatar);
   }, [initialBio, initialAvatar, username]);
 
-  useEffect(() => {
-    if (!bioOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [bioOpen]);
-
-  useEffect(() => {
-    if (!avatarViewOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [avatarViewOpen]);
+  usePageScrollLock(bioOpen || avatarViewOpen);
 
   function openBioModal() {
     setBioDraft(bio);

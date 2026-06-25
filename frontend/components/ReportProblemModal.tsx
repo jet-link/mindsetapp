@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePageScrollLock } from "@/lib/body-scroll-lock";
 import { THEME_BODY_LIMIT } from "@/lib/theme-body";
 
 export default function ReportProblemModal({
@@ -16,18 +17,11 @@ export default function ReportProblemModal({
 
   const overLimit = body.length > THEME_BODY_LIMIT;
 
+  usePageScrollLock(open);
+
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) setBody("");

@@ -26,6 +26,8 @@ import {
   ThemeRepostDetail,
   MediaItem,
   ProfileReply,
+  ProfileRepost,
+  Reply,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
   emitReplyDeleted,
@@ -44,7 +46,7 @@ import {
   getProfileTabsCache,
   setProfileTabsCache,
 } from "@/lib/profile-tabs-cache";
-import { findThemeInAllCaches } from "@/lib/theme-cache-lookup";
+import { findReplyInAllCaches, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
 import {
   findReturnAnchorByPrefix,
@@ -59,7 +61,32 @@ const ALL_TABS: ProfileTab[] = PROFILE_TABS;
 type TabSlice = ProfileSlice;
 
 function emptyTabSlice(): TabSlice {
-  return { themes: [], replies: [], media: [], nextCursor: null, loaded: false };
+  return {
+    themes: [],
+    replies: [],
+    media: [],
+    reposts: [],
+    nextCursor: null,
+    loaded: false,
+  };
+}
+
+function profileRepostKey(item: ProfileRepost): string {
+  if (item.kind === "theme" && item.theme) return `theme:${item.theme.id}`;
+  if (item.kind === "reply" && item.reply) return `reply:${item.reply.id}`;
+  return "";
+}
+
+function dedupeReposts(items: ProfileRepost[]): ProfileRepost[] {
+  const seen = new Set<string>();
+  const out: ProfileRepost[] = [];
+  for (const item of items) {
+    const k = profileRepostKey(item);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
 }
 
 /** Склейка страниц медиа без дублей (по файлу/ключу). Порядок сохраняем. */
@@ -103,6 +130,27 @@ function findThemeInSlices(
     for (const reply of slice.replies) {
       if (reply.theme.id === themeId) return reply.theme;
     }
+    const reposted = slice.reposts.find(
+      (r) => r.kind === "theme" && r.theme?.id === themeId,
+    );
+    if (reposted?.theme) return reposted.theme;
+  }
+  return null;
+}
+
+function findReplyInSlices(
+  slices: Record<ProfileTab, TabSlice>,
+  replyId: number,
+): Reply | null {
+  for (const tabId of ALL_TABS) {
+    const slice = slices[tabId];
+    for (const reply of slice.replies) {
+      if (reply.id === replyId) return reply;
+    }
+    const reposted = slice.reposts.find(
+      (r) => r.kind === "reply" && r.reply?.id === replyId,
+    );
+    if (reposted?.reply) return reposted.reply;
   }
   return null;
 }
@@ -114,8 +162,7 @@ function patchThemeRepostFlags(
   repostsCount: number,
 ): Record<ProfileTab, TabSlice> {
   return mapSlices(slices, (slice, tabId) => {
-    if (tabId === "reposts" && !reposted) return slice;
-    return {
+    const next = {
       ...slice,
       themes: slice.themes.map((t) =>
         t.id === themeId ? { ...t, is_reposted: reposted, reposts_count: repostsCount } : t,
@@ -128,23 +175,36 @@ function patchThemeRepostFlags(
             }
           : r,
       ),
+      reposts: slice.reposts.map((item) => {
+        if (item.kind !== "theme" || item.theme?.id !== themeId) return item;
+        return {
+          ...item,
+          theme: { ...item.theme, is_reposted: reposted, reposts_count: repostsCount },
+        };
+      }),
     };
+    if (tabId === "reposts" && !reposted) {
+      // Оставляем карточку в списке — удаление после exit-анимации в onExitComplete.
+      return slice;
+    }
+    return next;
   });
 }
 
 function prependToRepostsSlice(
   slices: Record<ProfileTab, TabSlice>,
-  theme: Theme,
+  item: ProfileRepost,
 ): Record<ProfileTab, TabSlice> {
   const repostsSlice = slices.reposts;
   // Не «достраиваем» незагруженный срез: пусть подтянет свежее с сервера.
   if (!repostsSlice.loaded) return slices;
-  const themes = repostsSlice.themes.some((t) => t.id === theme.id)
-    ? repostsSlice.themes.map((t) => (t.id === theme.id ? { ...t, ...theme } : t))
-    : [theme, ...repostsSlice.themes];
+  const key = profileRepostKey(item);
+  const reposts = repostsSlice.reposts.some((r) => profileRepostKey(r) === key)
+    ? repostsSlice.reposts.map((r) => (profileRepostKey(r) === key ? item : r))
+    : [item, ...repostsSlice.reposts];
   return {
     ...slices,
-    reposts: { ...repostsSlice, themes },
+    reposts: { ...repostsSlice, reposts },
   };
 }
 
@@ -234,14 +294,41 @@ type InitialState = {
   loadingTab: ProfileTab | null;
 };
 
+function normalizeSlice(slice: TabSlice, tabId: ProfileTab): TabSlice {
+  if (slice.reposts) return slice;
+  if (tabId === "reposts" && slice.themes.length > 0) {
+    return {
+      ...slice,
+      reposts: slice.themes.map((theme) => ({
+        kind: "theme" as const,
+        reposted_at: theme.created_at,
+        theme,
+        reply: null,
+      })),
+    };
+  }
+  return { ...slice, reposts: [] };
+}
+
+function normalizeSlices(
+  slices: Record<ProfileTab, TabSlice>,
+): Record<ProfileTab, TabSlice> {
+  const next = { ...slices };
+  for (const tabId of ALL_TABS) {
+    next[tabId] = normalizeSlice(slices[tabId] ?? emptyTabSlice(), tabId);
+  }
+  return next;
+}
+
 function resolveInitialState(username: string): InitialState {
   const cached = getProfileTabsCache(username);
   if (cached) {
     const tab = cached.tab;
+    const slices = normalizeSlices(cached.slices);
     return {
       tab,
-      slices: cached.slices,
-      loadingTab: cached.slices[tab].loaded ? null : tab,
+      slices,
+      loadingTab: slices[tab].loaded ? null : tab,
     };
   }
   const tab = resolveInitialTab(username);
@@ -270,7 +357,7 @@ export default function ProfileTabs({
   const programmaticScroll = useRef(false);
   const pendingThemeDeletes = useRef(new Set<number>());
   const pendingReplyDeletes = useRef(new Map<number, ReplyDeletedDetail>());
-  const [exitingRepostIds, setExitingRepostIds] = useState<Set<number>>(() => new Set());
+  const [exitingRepostIds, setExitingRepostIds] = useState<Set<string>>(() => new Set());
   const [exitingThemeIds, setExitingThemeIds] = useState<Set<number>>(() => new Set());
   const [exitingReplyIds, setExitingReplyIds] = useState<Set<number>>(() => new Set());
   const exitingThemeIdsRef = useRef(exitingThemeIds);
@@ -284,30 +371,35 @@ export default function ProfileTabs({
     setTabCounts(counts);
   }, [username, counts]);
 
-  const removeRepostFromSlice = useCallback((themeId: number) => {
-    const hadRepost = slicesRef.current.reposts.themes.some((t) => t.id === themeId);
+  const removeRepostFromSlice = useCallback((key: string) => {
+    const hadRepost = slicesRef.current.reposts.reposts.some(
+      (r) => profileRepostKey(r) === key,
+    );
     setSlices((prev) =>
       mapSlices(prev, (slice, tabId) => {
         if (tabId !== "reposts") return slice;
-        return { ...slice, themes: slice.themes.filter((t) => t.id !== themeId) };
+        return {
+          ...slice,
+          reposts: slice.reposts.filter((r) => profileRepostKey(r) !== key),
+        };
       }),
     );
     if (hadRepost) {
       setTabCounts((c) => ({ ...c, reposts: Math.max(0, c.reposts - 1) }));
     }
     setExitingRepostIds((prev) => {
-      if (!prev.has(themeId)) return prev;
+      if (!prev.has(key)) return prev;
       const next = new Set(prev);
-      next.delete(themeId);
+      next.delete(key);
       return next;
     });
   }, []);
 
-  const cancelRepostRemove = useCallback((themeId: number) => {
+  const cancelRepostRemove = useCallback((key: string) => {
     setExitingRepostIds((prev) => {
-      if (!prev.has(themeId)) return prev;
+      if (!prev.has(key)) return prev;
       const next = new Set(prev);
-      next.delete(themeId);
+      next.delete(key);
       return next;
     });
   }, []);
@@ -318,6 +410,9 @@ export default function ProfileTabs({
         ...slice,
         themes: slice.themes.filter((t) => t.id !== themeId),
         replies: slice.replies.filter((r) => r.theme.id !== themeId),
+        reposts: slice.reposts.filter(
+          (r) => !(r.kind === "theme" && r.theme?.id === themeId),
+        ),
       })),
     );
     setExitingThemeIds((prev) => {
@@ -407,12 +502,12 @@ export default function ProfileTabs({
   );
 
   const scheduleRepostRemove = useCallback(
-    (themeId: number) => {
+    (key: string) => {
       if (username !== getStoredUsername()) return;
       setExitingRepostIds((prev) => {
-        if (prev.has(themeId)) return prev;
+        if (prev.has(key)) return prev;
         const next = new Set(prev);
-        next.add(themeId);
+        next.add(key);
         return next;
       });
     },
@@ -420,17 +515,28 @@ export default function ProfileTabs({
   );
 
   const addRepostToSlice = useCallback(
-    (theme: Theme) => {
+    (item: ProfileRepost) => {
       if (username !== getStoredUsername()) return;
       setSlices((prev) => {
-        const updated = { ...theme, is_reposted: true };
-        const flagged = patchThemeRepostFlags(
-          prev,
-          theme.id,
-          true,
-          theme.reposts_count,
-        );
-        return prependToRepostsSlice(flagged, updated);
+        const flagged =
+          item.kind === "theme" && item.theme
+            ? patchThemeRepostFlags(
+                prev,
+                item.theme.id,
+                true,
+                item.theme.reposts_count,
+              )
+            : item.kind === "reply" && item.reply
+              ? mapSlices(prev, (slice) => ({
+                  ...slice,
+                  replies: slice.replies.map((r) =>
+                    r.id === item.reply!.id
+                      ? { ...r, is_reposted: true, reposts_count: item.reply!.reposts_count }
+                      : r,
+                  ),
+                }))
+              : prev;
+        return prependToRepostsSlice(flagged, item);
       });
     },
     [username],
@@ -450,15 +556,57 @@ export default function ProfileTabs({
       options?: { theme?: Theme; immediate?: boolean },
     ) => {
       if (username !== getStoredUsername()) return;
+      const key = `theme:${themeId}`;
       if (reposted) {
-        cancelRepostRemove(themeId);
+        cancelRepostRemove(key);
         const theme =
           options?.theme ?? findThemeInSlices(slicesRef.current, themeId);
-        if (theme) addRepostToSlice({ ...theme, is_reposted: true });
+        if (theme) {
+          addRepostToSlice({
+            kind: "theme",
+            reposted_at: new Date().toISOString(),
+            theme: { ...theme, is_reposted: true },
+            reply: null,
+          });
+        }
         return;
       }
-      if (options?.immediate) removeRepostFromSlice(themeId);
-      else scheduleRepostRemove(themeId);
+      if (options?.immediate) removeRepostFromSlice(key);
+      else scheduleRepostRemove(key);
+    },
+    [
+      addRepostToSlice,
+      cancelRepostRemove,
+      removeRepostFromSlice,
+      scheduleRepostRemove,
+      username,
+    ],
+  );
+
+  const handleReplyRepostChange = useCallback(
+    (
+      replyId: number,
+      reposted: boolean,
+      options?: { reply?: Reply; immediate?: boolean },
+    ) => {
+      if (username !== getStoredUsername()) return;
+      const key = `reply:${replyId}`;
+      if (reposted) {
+        cancelRepostRemove(key);
+        const reply =
+          options?.reply ?? findReplyInSlices(slicesRef.current, replyId);
+        if (reply) {
+          addRepostToSlice({
+            kind: "reply",
+            reposted_at: new Date().toISOString(),
+            theme: null,
+            reply: { ...reply, is_reposted: true },
+          });
+        }
+        return;
+      }
+      if (options?.immediate) removeRepostFromSlice(key);
+      else scheduleRepostRemove(key);
     },
     [
       addRepostToSlice,
@@ -524,6 +672,7 @@ export default function ProfileTabs({
                 themes: [],
                 replies: cursor ? [...slice.replies, ...page.results] : page.results,
                 media: [],
+                reposts: [],
                 nextCursor,
                 loaded: true,
               },
@@ -547,6 +696,7 @@ export default function ProfileTabs({
                 media: cursor
                   ? dedupeMedia([...slice.media, ...page.results])
                   : dedupeMedia(page.results),
+                reposts: [],
                 nextCursor,
                 loaded: true,
               },
@@ -555,19 +705,43 @@ export default function ProfileTabs({
           return;
         }
 
-        const fetcher = activeTab === "reposts" ? getUserReposts : getUserThemes;
-        const page = await fetcher(username, cursor);
+        if (activeTab === "reposts") {
+          const page = await getUserReposts(username, cursor);
+          const nextCursor = page.next
+            ? new URL(page.next, "http://x").searchParams.get("cursor")
+            : null;
+          setSlices((prev) => {
+            const slice = prev.reposts;
+            return {
+              ...prev,
+              reposts: {
+                themes: [],
+                replies: [],
+                media: [],
+                reposts: cursor
+                  ? dedupeReposts([...slice.reposts, ...page.results])
+                  : dedupeReposts(page.results),
+                nextCursor,
+                loaded: true,
+              },
+            };
+          });
+          return;
+        }
+
+        const page = await getUserThemes(username, cursor);
         const nextCursor = page.next
           ? new URL(page.next, "http://x").searchParams.get("cursor")
           : null;
         setSlices((prev) => {
-          const slice = prev[activeTab];
+          const slice = prev.themes;
           return {
             ...prev,
-            [activeTab]: {
+            themes: {
               themes: cursor ? [...slice.themes, ...page.results] : page.results,
               replies: [],
               media: [],
+              reposts: [],
               nextCursor,
               loaded: true,
             },
@@ -597,9 +771,10 @@ export default function ProfileTabs({
     unlockScroll();
     const cached = getProfileTabsCache(username);
     if (cached) {
+      const slices = normalizeSlices(cached.slices);
       setTab(cached.tab);
-      setSlices(cached.slices);
-      setLoadingTab(cached.slices[cached.tab].loaded ? null : cached.tab);
+      setSlices(slices);
+      setLoadingTab(slices[cached.tab].loaded ? null : cached.tab);
       setExitingRepostIds(new Set());
       setExitingThemeIds(new Set());
       setExitingReplyIds(new Set());
@@ -739,13 +914,16 @@ export default function ProfileTabs({
     const onThemeRepost = (e: Event) => {
       const { themeId, reposted, reposts_count } = (e as CustomEvent<ThemeRepostDetail>).detail;
       const isOwnProfile = username === getStoredUsername();
+      const key = `theme:${themeId}`;
       if (!reposted && isOwnProfile) {
-        scheduleRepostRemove(themeId);
+        scheduleRepostRemove(key);
       }
       const hadRepost =
         reposted &&
         isOwnProfile &&
-        slicesRef.current.reposts.themes.some((t) => t.id === themeId);
+        slicesRef.current.reposts.reposts.some(
+          (r) => r.kind === "theme" && r.theme?.id === themeId,
+        );
       setSlices((prev) => {
         let next = patchThemeRepostFlags(prev, themeId, reposted, reposts_count);
         if (reposted && isOwnProfile) {
@@ -753,9 +931,10 @@ export default function ProfileTabs({
             findThemeInSlices(next, themeId) ?? findThemeInAllCaches(themeId);
           if (source) {
             next = prependToRepostsSlice(next, {
-              ...source,
-              is_reposted: true,
-              reposts_count,
+              kind: "theme",
+              reposted_at: new Date().toISOString(),
+              theme: { ...source, is_reposted: true, reposts_count },
+              reply: null,
             });
           } else if (next.reposts.loaded) {
             // Темы нет в кэше — помечаем срез репостов на дозагрузку.
@@ -815,14 +994,50 @@ export default function ProfileTabs({
     };
     const onReplyRepost = (e: Event) => {
       const { replyId, reposted, reposts_count } = (e as CustomEvent<ReplyRepostDetail>).detail;
-      setSlices((prev) =>
-        mapSlices(prev, (slice) => ({
+      const isOwnProfile = username === getStoredUsername();
+      const key = `reply:${replyId}`;
+      if (!reposted && isOwnProfile) {
+        scheduleRepostRemove(key);
+      }
+      const hadRepost =
+        reposted &&
+        isOwnProfile &&
+        slicesRef.current.reposts.reposts.some(
+          (r) => r.kind === "reply" && r.reply?.id === replyId,
+        );
+      setSlices((prev) => {
+        let next = mapSlices(prev, (slice) => ({
           ...slice,
           replies: slice.replies.map((r) =>
             r.id === replyId ? { ...r, is_reposted: reposted, reposts_count } : r,
           ),
-        })),
-      );
+          reposts: slice.reposts.map((item) => {
+            if (item.kind !== "reply" || item.reply?.id !== replyId) return item;
+            return {
+              ...item,
+              reply: { ...item.reply, is_reposted: reposted, reposts_count },
+            };
+          }),
+        }));
+        if (reposted && isOwnProfile) {
+          const source =
+            findReplyInSlices(next, replyId) ?? findReplyInAllCaches(replyId);
+          if (source) {
+            next = prependToRepostsSlice(next, {
+              kind: "reply",
+              reposted_at: new Date().toISOString(),
+              theme: null,
+              reply: { ...source, is_reposted: true, reposts_count },
+            });
+          } else if (next.reposts.loaded) {
+            next = { ...next, reposts: { ...next.reposts, loaded: false } };
+          }
+        }
+        return next;
+      });
+      if (reposted && isOwnProfile && !hadRepost) {
+        setTabCounts((c) => ({ ...c, reposts: c.reposts + 1 }));
+      }
     };
     const onThemeDeleted = (e: Event) => {
       const { themeId } = (e as CustomEvent<ThemeDeletedDetail>).detail;
@@ -914,7 +1129,8 @@ export default function ProfileTabs({
       !activeLoading &&
       (activeSlice.themes.length > 0 ||
         activeSlice.replies.length > 0 ||
-        activeSlice.media.length > 0),
+        activeSlice.media.length > 0 ||
+        activeSlice.reposts.length > 0),
   );
 
   const sentinelRef = useInfiniteScroll({
@@ -935,6 +1151,9 @@ export default function ProfileTabs({
   const isOwnProfile = getStoredUsername() === username;
   const themeRepostProps = isOwnProfile
     ? { onRepostChange: handleRepostChange }
+    : {};
+  const replyRepostProps = isOwnProfile
+    ? { onRepostChange: handleReplyRepostChange }
     : {};
 
   return (
@@ -967,7 +1186,9 @@ export default function ProfileTabs({
               ? slice.replies
               : tabId === "media"
                 ? slice.media
-                : slice.themes;
+                : tabId === "reposts"
+                  ? slice.reposts
+                  : slice.themes;
           const showPanel = isActive || slice.loaded;
 
           if (!showPanel) return null;
@@ -1024,19 +1245,43 @@ export default function ProfileTabs({
                       </ListExitWrap>
                     ))
                   : tabId === "reposts"
-                    ? slice.themes.map((t) => (
-                        <ListExitWrap
-                          key={`${tabId}-${t.id}`}
-                          exiting={exitingRepostIds.has(t.id)}
-                          onExitComplete={() => removeRepostFromSlice(t.id)}
-                        >
-                          <ThemeCard
-                            theme={t}
-                            {...themeRepostProps}
-                            onDeleted={() => removeThemeFromSlices(t.id)}
-                          />
-                        </ListExitWrap>
-                      ))
+                    ? slice.reposts.map((item) => {
+                        const key = profileRepostKey(item);
+                        if (item.kind === "reply" && item.reply) {
+                          const reply = item.reply;
+                          return (
+                            <ListExitWrap
+                              key={key}
+                              exiting={exitingRepostIds.has(key)}
+                              onExitComplete={() => removeRepostFromSlice(key)}
+                            >
+                              <ReplyCard
+                                reply={reply}
+                                clickable
+                                showReplyBadge
+                                {...replyRepostProps}
+                              />
+                            </ListExitWrap>
+                          );
+                        }
+                        if (item.kind === "theme" && item.theme) {
+                          const theme = item.theme;
+                          return (
+                            <ListExitWrap
+                              key={key}
+                              exiting={exitingRepostIds.has(key)}
+                              onExitComplete={() => removeRepostFromSlice(key)}
+                            >
+                              <ThemeCard
+                                theme={theme}
+                                {...themeRepostProps}
+                                onDeleted={() => removeThemeFromSlices(theme.id)}
+                              />
+                            </ListExitWrap>
+                          );
+                        }
+                        return null;
+                      })
                     : tabId === "themes"
                       ? slice.themes.map((t) => (
                           <ListExitWrap
@@ -1056,7 +1301,7 @@ export default function ProfileTabs({
                             />
                           </ListExitWrap>
                         ))
-                      : <ProfileMediaGrid items={slice.media} />}
+                      : <ProfileMediaGrid username={username} items={slice.media} />}
               </div>
 
               {isActive && isLoading && items.length === 0 && (

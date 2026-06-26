@@ -126,6 +126,15 @@ class ThemeSerializer(_ViewerFlagsMixin, serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ProfileRepostSerializer(serializers.Serializer):
+    """Элемент вкладки Reposts: репост темы или ответа."""
+
+    kind = serializers.CharField()
+    reposted_at = serializers.DateTimeField()
+    theme = ThemeSerializer(required=False, allow_null=True)
+    reply = ReplySerializer(required=False, allow_null=True)
+
+
 class ThemeCreateSerializer(serializers.Serializer):
     """Вход на создание/редактирование темы; body — сырой HTML/текст,
     санитизация в сервисном слое."""

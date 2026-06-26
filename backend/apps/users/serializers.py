@@ -87,9 +87,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return theme_media + reply_media
 
     def get_reposts_count(self, obj) -> int:
-        from apps.threads.models import ThemeRepost
+        from apps.threads.models import ReplyRepost, ThemeRepost
 
-        return ThemeRepost.objects.filter(user=obj).count()
+        theme_reposts = ThemeRepost.objects.filter(user=obj).count()
+        reply_reposts = ReplyRepost.objects.filter(user=obj).count()
+        return theme_reposts + reply_reposts
 
 
 class RegisterSerializer(serializers.ModelSerializer):

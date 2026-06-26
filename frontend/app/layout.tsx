@@ -17,8 +17,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=localStorage.getItem("mindset-theme");if(m!=="sun"&&m!=="night"&&m!=="auto")m="sun";var d=m==="night"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var t=d?"dark":"light";var e=document.documentElement;e.setAttribute("data-theme",t);e.style.colorScheme=t;}catch(e){}})();`,
+          }}
+        />
         <link
           rel="stylesheet"
           href="/vendor/font-awesome/css/font-awesome.min.css"

@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import ReportProblemModal from "@/components/ReportProblemModal";
 import { AUTH_EVENT, isLoggedIn } from "@/lib/api";
+import {
+  DEFAULT_THEME_MODE,
+  THEME_CHANGE_EVENT,
+  getStoredThemeMode,
+  setThemeMode as persistThemeMode,
+  watchSystemTheme,
+  type ThemeMode,
+} from "@/lib/theme";
 
 type ExtrasPanelView = "menu" | "theme" | "language";
-type ThemeMode = "sun" | "night" | "auto";
-type LanguageMode = "eng" | "rus";
+type LanguageMode = "eng" | "rus" | "uzb";
 
 function SegmentToggle<T extends string>({
   options,
@@ -82,7 +89,7 @@ function ExtrasSubpanel({
 export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav" | "header" }) {
   const [open, setOpen] = useState(false);
   const [panelView, setPanelView] = useState<ExtrasPanelView>("menu");
-  const [themeMode, setThemeMode] = useState<ThemeMode>("sun");
+  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME_MODE);
   const [languageMode, setLanguageMode] = useState<LanguageMode>("eng");
   const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,6 +101,27 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
     window.addEventListener(AUTH_EVENT, onAuthChange);
     return () => window.removeEventListener(AUTH_EVENT, onAuthChange);
   }, []);
+
+  // Синхронизируем выбранный режим из localStorage, между инстансами меню
+  // (sidenav + header) и реагируем на системную смену темы в режиме "auto".
+  useEffect(() => {
+    setThemeMode(getStoredThemeMode());
+    const onThemeChange = (e: Event) => {
+      const next = (e as CustomEvent<ThemeMode>).detail;
+      if (next) setThemeMode(next);
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    const unwatch = watchSystemTheme(getStoredThemeMode);
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
+      unwatch();
+    };
+  }, []);
+
+  const handleThemeChange = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    persistThemeMode(mode);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -163,7 +191,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
               <SegmentToggle
                 ariaLabel="Theme"
                 value={themeMode}
-                onChange={setThemeMode}
+                onChange={handleThemeChange}
                 options={[
                   {
                     value: "sun",
@@ -181,12 +209,12 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
             <ExtrasSubpanel title="Language" onBack={() => setPanelView("menu")}>
               <SegmentToggle
                 ariaLabel="Language"
-                twoColumns
                 value={languageMode}
                 onChange={setLanguageMode}
                 options={[
                   { value: "eng", label: "ENG", text: true },
                   { value: "rus", label: "RUS", text: true },
+                  { value: "uzb", label: "UZB", text: true },
                 ]}
               />
             </ExtrasSubpanel>

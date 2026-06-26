@@ -27,6 +27,7 @@ import {
   markProfileSliceStale,
   prependReplyToProfileCache,
   prependRepostToProfileCache,
+  prependReplyRepostToProfileCache,
   prependThemeToProfileCache,
   updateThemeLikeInProfileCache,
   updateThemeRepostInProfileCache,
@@ -42,7 +43,7 @@ import {
   updateThemeRepostInTagCaches,
   removeThemeFromTagCaches,
 } from "./tag-cache";
-import { findThemeInAllCaches } from "./theme-cache-lookup";
+import { findReplyInAllCaches, findThemeInAllCaches } from "./theme-cache-lookup";
 import { setUserAvatarOverride } from "./user-avatar-store";
 
 export interface UserPublic {
@@ -79,6 +80,9 @@ export interface MediaItem {
   srcset: string;
   // Уникальный ключ через таблицы (theme/reply), приходит на вкладке Media.
   key?: string;
+  source_type?: "theme" | "reply";
+  theme_id?: number;
+  reply_id?: number | null;
 }
 
 export interface Hashtag {
@@ -130,6 +134,13 @@ export interface ProfileReply extends Reply {
   // Если ответ дан на другой ответ — здесь лежит родительский ответ,
   // и фронт показывает его как контекст вместо темы.
   parent?: Reply | null;
+}
+
+export interface ProfileRepost {
+  kind: "theme" | "reply";
+  reposted_at: string;
+  theme: Theme | null;
+  reply: Reply | null;
 }
 
 export interface CursorPage<T> {
@@ -557,7 +568,7 @@ export const getUserThemes = (username: string, cursor?: string) =>
   );
 
 export const getUserReposts = (username: string, cursor?: string) =>
-  apiFetch<CursorPage<Theme>>(
+  apiFetch<CursorPage<ProfileRepost>>(
     `/api/v1/users/${encodeURIComponent(username)}/reposts/${buildQuery({ cursor })}`,
   );
 
@@ -908,6 +919,18 @@ export interface ReplyRepostDetail {
 
 export function emitReplyRepostChanged(detail: ReplyRepostDetail) {
   updateReplyRepostInProfileCache(detail.replyId, detail.reposted, detail.reposts_count);
+  if (detail.reposted) {
+    const reply = findReplyInAllCaches(detail.replyId);
+    if (reply) {
+      prependReplyRepostToProfileCache({
+        ...reply,
+        is_reposted: true,
+        reposts_count: detail.reposts_count,
+      });
+    } else {
+      markProfileSliceStale("reposts");
+    }
+  }
   applyReplyRepostChanged(detail.replyId, detail.reposted, detail.reposts_count);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_REPOST_EVENT, { detail }));

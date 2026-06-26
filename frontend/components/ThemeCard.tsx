@@ -282,11 +282,9 @@ export default function ThemeCard({
           >
             <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
           </button>
-          {/* Share theme (bullhorn) — отключено, вернём позже
-          <button type="button" aria-label="Share theme" onClick={onShare}>
-            <i className="fa fa-bullhorn" aria-hidden="true" /> {formatCount(shares)}
+          <button type="button" aria-label="Send" onPointerDown={(e) => bouncePress(e.currentTarget)}>
+            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCount(0)}
           </button>
-          */}
         </div>
       </div>
     </article>

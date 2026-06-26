@@ -15,7 +15,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.pagination import FeedCursorPagination, RepostedAtCursorPagination
+from apps.core.pagination import FeedCursorPagination
 from apps.core.throttling import (
     REPLY_COOLDOWN,
     THEME_COOLDOWN,
@@ -38,6 +38,7 @@ from .models import (
 )
 from .serializers import (
     MediaSerializer,
+    ProfileRepostSerializer,
     ProfileReplySerializer,
     ReplyCreateSerializer,
     ReplySerializer,
@@ -397,31 +398,99 @@ class UserThemesView(generics.ListAPIView):
         return {**super().get_serializer_context(), **_viewer_context(self.request, themes)}
 
 
-class UserRepostsView(generics.ListAPIView):
-    """GET /users/{username}/reposts/ — темы, которые пользователь репостнул.
+class UserRepostsView(APIView):
+    """GET /users/{username}/reposts/ — темы и ответы, которые пользователь репостнул.
 
-    Сортировка по времени репоста (reposted_at), а не по дате темы:
-    свежие репосты — сверху."""
+    Сортировка по времени репоста (reposted_at), а не по дате поста.
+    Offset-курсор, т.к. поток объединён из двух таблиц."""
 
-    serializer_class = ThemeSerializer
-    pagination_class = RepostedAtCursorPagination
+    PAGE_SIZE = 20
 
-    def get_queryset(self):
-        user = get_object_or_404(User, username=self.kwargs['username'])
-        return (
-            _theme_queryset()
-            .filter(reposts__user=user)
-            .annotate(
-                reposted_at=Max(
-                    'reposts__created_at', filter=Q(reposts__user=user)
-                )
-            )
+    def _offset(self, request) -> int:
+        try:
+            return max(0, int(request.query_params.get('cursor')))
+        except (TypeError, ValueError):
+            return 0
+
+    def get(self, request, username):
+        user = get_object_or_404(User, username=username)
+
+        theme_rows = list(
+            ThemeRepost.objects.filter(user=user, theme__is_deleted=False)
+            .values_list('pk', 'theme_id', 'created_at')
+        )
+        reply_rows = list(
+            ReplyRepost.objects.filter(
+                user=user,
+                reply__is_deleted=False,
+                reply__theme__is_deleted=False,
+            ).values_list('pk', 'reply_id', 'created_at')
         )
 
-    def get_serializer_context(self):
-        page = getattr(self.paginator, 'page', None)
-        themes = list(page) if page is not None else []
-        return {**super().get_serializer_context(), **_viewer_context(self.request, themes)}
+        combined = [
+            ('theme', theme_id, ts, pk) for pk, theme_id, ts in theme_rows
+        ]
+        combined += [
+            ('reply', reply_id, ts, pk) for pk, reply_id, ts in reply_rows
+        ]
+        combined.sort(key=lambda x: (x[2], x[3]), reverse=True)
+
+        offset = self._offset(request)
+        page_rows = combined[offset:offset + self.PAGE_SIZE]
+
+        theme_ids = [obj_id for kind, obj_id, _, _ in page_rows if kind == 'theme']
+        reply_ids = [obj_id for kind, obj_id, _, _ in page_rows if kind == 'reply']
+
+        themes_map = {
+            t.pk: t for t in _theme_queryset().filter(pk__in=theme_ids)
+        }
+        replies_map = {
+            r.pk: r
+            for r in Reply.objects.filter(
+                pk__in=reply_ids,
+                is_deleted=False,
+                theme__is_deleted=False,
+            )
+            .select_related('author', 'theme', 'theme__author')
+            .prefetch_related('media')
+        }
+
+        theme_ctx = _viewer_context(request, list(themes_map.values()))
+        reply_ctx = _reply_viewer_context(request, list(replies_map.values()))
+
+        results = []
+        for kind, obj_id, reposted_at, _pk in page_rows:
+            if kind == 'theme':
+                theme = themes_map.get(obj_id)
+                if theme is None:
+                    continue
+                ctx = {**theme_ctx, 'request': request}
+                item = {
+                    'kind': 'theme',
+                    'reposted_at': reposted_at,
+                    'theme': theme,
+                    'reply': None,
+                }
+            else:
+                reply = replies_map.get(obj_id)
+                if reply is None:
+                    continue
+                ctx = {**reply_ctx, 'request': request}
+                item = {
+                    'kind': 'reply',
+                    'reposted_at': reposted_at,
+                    'theme': None,
+                    'reply': reply,
+                }
+            results.append(ProfileRepostSerializer(item, context=ctx).data)
+
+        next_url = None
+        if offset + self.PAGE_SIZE < len(combined):
+            next_offset = offset + self.PAGE_SIZE
+            next_url = request.build_absolute_uri(
+                f'{request.path}?cursor={next_offset}'
+            )
+        return Response({'next': next_url, 'previous': None, 'results': results})
 
 
 def _profile_reply_context(request, replies: list[Reply]) -> dict:
@@ -538,6 +607,14 @@ class UserMediaView(APIView):
             if url:
                 seen_urls.add(url)
             data['key'] = f'{src}{pk}'
+            if src == 't':
+                data['source_type'] = 'theme'
+                data['theme_id'] = obj.theme_id
+                data['reply_id'] = None
+            else:
+                data['source_type'] = 'reply'
+                data['theme_id'] = obj.reply.theme_id
+                data['reply_id'] = obj.reply_id
             results.append(data)
 
         next_url = None

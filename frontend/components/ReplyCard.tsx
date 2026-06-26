@@ -32,9 +32,11 @@ import { seedReplyDetailReply } from "@/lib/detail-cache";
 export default function ReplyCard({
   reply,
   showViewTheme = false,
+  showReplyBadge = false,
   indented = false,
   clickable = false,
   threadLineBelow = false,
+  onRepostChange,
   onDeleted,
   listExitViaParent = false,
   onDeleteExitStart,
@@ -42,9 +44,15 @@ export default function ReplyCard({
 }: {
   reply: Reply;
   showViewTheme?: boolean;
+  showReplyBadge?: boolean;
   indented?: boolean;
   clickable?: boolean;
   threadLineBelow?: boolean;
+  onRepostChange?: (
+    replyId: number,
+    reposted: boolean,
+    options?: { reply?: Reply; immediate?: boolean },
+  ) => void;
   onDeleted?: () => void;
   listExitViaParent?: boolean;
   onDeleteExitStart?: (detail: ReplyDeletedDetail) => void;
@@ -131,16 +139,39 @@ export default function ReplyCard({
       router.push("/login");
       return;
     }
+    const optimistic = !reposted;
+    setReposted(optimistic);
+    if (optimistic) {
+      onRepostChange?.(reply.id, true, {
+        reply: { ...reply, is_reposted: true, reposts_count: reposts + 1 },
+      });
+    } else {
+      onRepostChange?.(reply.id, false);
+    }
     try {
       const r = await toggleReplyRepost(reply.id);
       setReposted(r.reposted);
       setReposts(r.reposts_count);
+      if (r.reposted !== optimistic) {
+        onRepostChange?.(reply.id, r.reposted, {
+          reply: r.reposted
+            ? { ...reply, is_reposted: true, reposts_count: r.reposts_count }
+            : undefined,
+          immediate: !r.reposted,
+        });
+      }
       emitReplyRepostChanged({
         replyId: reply.id,
         reposted: r.reposted,
         reposts_count: r.reposts_count,
       });
     } catch {
+      setReposted(!optimistic);
+      if (optimistic) {
+        onRepostChange?.(reply.id, false, { immediate: true });
+      } else {
+        onRepostChange?.(reply.id, true);
+      }
       window.location.href = "/login";
     }
   }
@@ -194,6 +225,8 @@ export default function ReplyCard({
               {reply.author.username}
             </Link>
             <span className="time">· {reply.human_published}</span>
+            {showReplyBadge && <span className="time">·</span>}
+            {showReplyBadge && <span className="card-badge">Reply</span>}
           </div>
           <CardMenu
             kind="reply"
@@ -257,6 +290,9 @@ export default function ReplyCard({
             onClick={onRepost}
           >
             <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
+          </button>
+          <button type="button" aria-label="Send" onPointerDown={(e) => bouncePress(e.currentTarget)}>
+            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCount(0)}
           </button>
           {showViewTheme && (
             <Link href={`/thread/${reply.theme_id}`} className="view-theme">

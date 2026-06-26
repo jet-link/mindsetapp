@@ -11,6 +11,44 @@ function aspectStyle(m: MediaItem): React.CSSProperties {
   return {};
 }
 
+function isWideSingleImage(m: MediaItem): boolean {
+  if (m.width && m.height) {
+    return m.width > m.height;
+  }
+  return m.orientation_kind === "wide" || m.orientation_kind === "landscape";
+}
+
+function MediaThumb({
+  media: m,
+  onOpen,
+  wide,
+}: {
+  media: MediaItem;
+  onOpen: () => void;
+  wide?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`media-thumb media-thumb--image${wide ? " media-thumb--wide" : ""}`}
+      style={aspectStyle(m)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      aria-label="Open image"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={m.medium_url || m.url}
+        srcSet={m.srcset || undefined}
+        sizes={wide ? "100vw" : "(max-width: 620px) 70vw, 360px"}
+        alt=""
+      />
+    </button>
+  );
+}
+
 export default function MediaCarousel({ media }: { media: MediaItem[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -18,29 +56,43 @@ export default function MediaCarousel({ media }: { media: MediaItem[] }) {
 
   const lightboxOpen = lightboxIndex !== null;
 
+  if (media.length === 1) {
+    const single = media[0];
+    const wide = isWideSingleImage(single);
+    return (
+      <>
+        <div
+          className={`card-media card-media--single${
+            wide ? " card-media--wide" : " card-media--portrait"
+          }`}
+        >
+          <MediaThumb
+            media={single}
+            wide={wide}
+            onOpen={() => setLightboxIndex(0)}
+          />
+        </div>
+
+        {lightboxOpen && (
+          <MediaLightbox
+            media={media}
+            startIndex={lightboxIndex as number}
+            onClose={() => setLightboxIndex(null)}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="card-media">
         {media.map((m, idx) => (
-          <button
+          <MediaThumb
             key={m.id}
-            type="button"
-            className="media-thumb media-thumb--image"
-            style={aspectStyle(m)}
-            onClick={(e) => {
-              e.stopPropagation();
-              setLightboxIndex(idx);
-            }}
-            aria-label="Open image"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={m.medium_url || m.url}
-              srcSet={m.srcset || undefined}
-              sizes="(max-width: 620px) 70vw, 360px"
-              alt=""
-            />
-          </button>
+            media={m}
+            onOpen={() => setLightboxIndex(idx)}
+          />
         ))}
       </div>
 

@@ -65,17 +65,11 @@ export function updateThemeRepostInFeedCache(
 
 export function prependThemeToFeedCache(theme: Theme) {
   // Своя новая тема — только во вкладку For you, не в Following.
+  // Не создаём кэш с одной темой: иначе лента помечается loaded и не догружает остальное.
   const cache = feedCaches["for-you"];
-  if (cache) {
-    if (cache.themes.some((t) => t.id === theme.id)) return;
-    cache.themes = [theme, ...cache.themes];
-    return;
-  }
-  feedCaches["for-you"] = {
-    themes: [theme],
-    nextCursor: null,
-    scrollY: 0,
-  };
+  if (!cache) return;
+  if (cache.themes.some((t) => t.id === theme.id)) return;
+  cache.themes = [theme, ...cache.themes];
 }
 
 export function updateThemeRepliesInFeedCache(themeId: number, repliesCount: number) {

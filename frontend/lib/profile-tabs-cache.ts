@@ -1,4 +1,4 @@
-import type { MediaItem, ProfileReply, ReplyCreatedDetail, Theme } from "@/lib/api";
+import type { MediaItem, ProfileReply, ProfileRepost, Reply, ReplyCreatedDetail, Theme } from "@/lib/api";
 import { getStoredUsername } from "@/lib/api";
 import { findReplyInAllCaches, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 
@@ -10,6 +10,7 @@ export type ProfileSlice = {
   themes: Theme[];
   replies: ProfileReply[];
   media: MediaItem[];
+  reposts: ProfileRepost[];
   nextCursor: string | null;
   loaded: boolean;
 };
@@ -71,7 +72,8 @@ export function updateThemeRepostInProfileCache(
 ) {
   mapCachedSlices((slice, tab) => {
     if (tab === "reposts" && !reposted) {
-      return { ...slice, themes: slice.themes.filter((t) => t.id !== themeId) };
+      // Карточку уберём после exit-анимации на открытой вкладке Reposts.
+      return slice;
     }
     return {
       ...slice,
@@ -127,22 +129,38 @@ export function updateReplyRepostInProfileCache(
   reposted: boolean,
   repostsCount: number,
 ) {
-  mapCachedSlices((slice) => ({
-    ...slice,
-    replies: slice.replies.map((r) =>
-      r.id === replyId ? { ...r, is_reposted: reposted, reposts_count: repostsCount } : r,
-    ),
-  }));
+  mapCachedSlices((slice, tab) => {
+    if (tab === "reposts" && !reposted) {
+      // Карточку уберём после exit-анимации на открытой вкладке Reposts.
+      return slice;
+    }
+    return {
+      ...slice,
+      replies: slice.replies.map((r) =>
+        r.id === replyId ? { ...r, is_reposted: reposted, reposts_count: repostsCount } : r,
+      ),
+      reposts: slice.reposts.map((item) => {
+        if (item.kind !== "reply" || item.reply?.id !== replyId) return item;
+        return {
+          ...item,
+          reply: { ...item.reply, is_reposted: reposted, reposts_count: repostsCount },
+        };
+      }),
+    };
+  });
 }
 
 export function removeThemeFromProfileCache(themeId: number) {
   mapCachedSlices((slice, tab) => {
     const themes = slice.themes.filter((t) => t.id !== themeId);
     const replies = slice.replies.filter((r) => r.theme.id !== themeId);
+    const reposts = slice.reposts.filter(
+      (r) => !(r.kind === "theme" && r.theme?.id === themeId),
+    );
     if (tab === "reposts") {
-      return { ...slice, themes };
+      return { ...slice, reposts };
     }
-    return { ...slice, themes, replies };
+    return { ...slice, themes, replies, reposts };
   });
 }
 
@@ -160,6 +178,10 @@ export function findThemeInProfileCache(themeId: number): Theme | null {
     if (hit) return hit;
     const nested = profileTabsCache.slices[tab].replies.find((r) => r.theme.id === themeId);
     if (nested) return nested.theme;
+    const reposted = profileTabsCache.slices[tab].reposts.find(
+      (r) => r.kind === "theme" && r.theme?.id === themeId,
+    );
+    if (reposted?.theme) return reposted.theme;
   }
   return null;
 }
@@ -169,6 +191,10 @@ export function findReplyInProfileCache(replyId: number): ProfileReply | null {
   for (const tab of PROFILE_TABS) {
     const hit = profileTabsCache.slices[tab].replies.find((r) => r.id === replyId);
     if (hit) return hit;
+    const reposted = profileTabsCache.slices[tab].reposts.find(
+      (r) => r.kind === "reply" && r.reply?.id === replyId,
+    );
+    if (reposted?.reply) return reposted.reply as ProfileReply;
   }
   return null;
 }
@@ -266,9 +292,63 @@ export function prependRepostToProfileCache(theme: Theme) {
     }
     // Незагруженный срез репостов не достраиваем — подтянется свежим при открытии.
     if (!slice.loaded) return slice;
-    const themes = slice.themes.some((t) => t.id === theme.id)
-      ? slice.themes.map((t) => (t.id === theme.id ? { ...t, ...repostedTheme } : t))
-      : [repostedTheme, ...slice.themes];
-    return { ...slice, themes };
+    const item: ProfileRepost = {
+      kind: "theme",
+      reposted_at: new Date().toISOString(),
+      theme: repostedTheme,
+      reply: null,
+    };
+    const reposts = slice.reposts.some(
+      (r) => r.kind === "theme" && r.theme?.id === theme.id,
+    )
+      ? slice.reposts.map((r) =>
+          r.kind === "theme" && r.theme?.id === theme.id
+            ? { ...r, theme: repostedTheme }
+            : r,
+        )
+      : [item, ...slice.reposts];
+    return { ...slice, reposts };
+  });
+}
+
+/** Репост ответа с ленты/треда: добавляем во вкладку Reposts профиля. */
+export function prependReplyRepostToProfileCache(reply: Reply) {
+  const username = getStoredUsername();
+  if (!username || !profileTabsCache || profileTabsCache.username !== username) return;
+
+  const repostedReply = { ...reply, is_reposted: true };
+
+  mapCachedSlices((slice, tab) => {
+    if (tab !== "reposts") {
+      return {
+        ...slice,
+        replies: slice.replies.map((r) =>
+          r.id === reply.id
+            ? { ...r, is_reposted: true, reposts_count: repostedReply.reposts_count }
+            : r,
+        ),
+        reposts: slice.reposts.map((item) => {
+          if (item.kind !== "reply" || item.reply?.id !== reply.id) return item;
+          return { ...item, reply: repostedReply };
+        }),
+      };
+    }
+    if (!slice.loaded) return slice;
+    const item: ProfileRepost = {
+      kind: "reply",
+      reposted_at: new Date().toISOString(),
+      theme: null,
+      reply: repostedReply,
+    };
+    const reposts = slice.reposts.some(
+      (r) => r.kind === "reply" && r.reply?.id === reply.id,
+    )
+      ? slice.reposts.map((r) =>
+          r.kind === "reply" && r.reply?.id === reply.id
+            ? { ...r, reply: repostedReply }
+            : r,
+        )
+      : [item, ...slice.reposts];
+    return { ...slice, reposts };
   });
 }

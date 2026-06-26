@@ -23,6 +23,7 @@ import {
   FeedTab,
   Theme,
   getFeed,
+  getStoredUsername,
   isLoggedIn,
 } from "@/lib/api";
 import {
@@ -382,13 +383,20 @@ export default function Feed() {
   useEffect(() => {
     const onThemeCreated = (e: Event) => {
       const theme = (e as CustomEvent<Theme>).detail;
+      const myUsername = getStoredUsername();
       setSlices((prev) => {
-        const slice = prev["for-you"];
-        if (slice.themes.some((t) => t.id === theme.id)) return prev;
-        return {
-          ...prev,
-          "for-you": { ...slice, themes: [theme, ...slice.themes] },
-        };
+        const next = { ...prev };
+        const forYou = prev["for-you"];
+        if (!forYou.themes.some((t) => t.id === theme.id)) {
+          next["for-you"] = { ...forYou, themes: [theme, ...forYou.themes] };
+        }
+        if (myUsername && theme.author.username === myUsername) {
+          next.following = {
+            ...prev.following,
+            themes: prev.following.themes.filter((t) => t.id !== theme.id),
+          };
+        }
+        return next;
       });
     };
     const onReplyCreated = (e: Event) => {

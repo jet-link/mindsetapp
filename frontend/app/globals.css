@@ -664,15 +664,15 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-dim);
   font-size: 14px;
 }
-.discover-search__remove:hover {
+/* .discover-search__remove:hover {
   color: var(--text);
   background: color-mix(in srgb, var(--text) 8%, transparent);
-}
+} */
 .discover-search__item {
   all: unset;
   box-sizing: border-box;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   width: 100%;
   cursor: pointer;
@@ -687,7 +687,7 @@ a { color: inherit; text-decoration: none; }
 .discover-search__item .fa {
   flex-shrink: 0;
   width: 14px;
-  margin-top: 3px;
+  /* margin-top: 3px; */
   font-size: 14px;
   text-align: center;
   color: var(--text-dim);
@@ -872,7 +872,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  /* box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); */
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -1354,8 +1354,8 @@ textarea:focus { outline: 2px solid #b9b9b9; }
 .profile-info { flex: 1; min-width: 0; }
 .profile-head h1 { margin: 0; font-size: 26px; line-height: 1.2; }
 .profile-handle {
-  margin: 8px 0 12px;
-  font-size: 15px;
+  margin: 5px 0;
+  font-size: 14px;
   line-height: 1.2;
   color: var(--text-dim);
 }

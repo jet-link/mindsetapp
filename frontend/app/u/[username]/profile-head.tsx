@@ -128,6 +128,8 @@ export default function ProfileHead({
   const canInteract = avatarUrl || isOwn;
   const bioTitle = bio ? "Edit bio" : "Add bio";
   const bioOverLimit = bioCharCount(bioDraft) > BIO_LIMIT;
+  const bioEmpty = !bioDraft.trim();
+  const bioSubmitDisabled = bioBusy || bioOverLimit || (!bio && bioEmpty);
 
   return (
     <>
@@ -234,7 +236,7 @@ export default function ProfileHead({
                 </p>
               )}
               <div className="surface-form-card__footer">
-                <button type="submit" className="btn" disabled={bioBusy || bioOverLimit}>
+                <button type="submit" className="btn" disabled={bioSubmitDisabled}>
                   {bio ? "Edit" : "Add"}
                 </button>
                 <span

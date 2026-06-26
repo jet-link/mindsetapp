@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models import Case, Count, IntegerField, Max, Q, Value, When
 from django.utils import timezone
 
 from apps.threads.models import Hashtag, Theme
@@ -17,6 +17,7 @@ User = get_user_model()
 DISCOVER_POPULAR_CACHE_KEY = 'search:discover:popular:v1'
 DISCOVER_TRENDING_CACHE_KEY = 'search:discover:trending:v1'
 POPULAR_QUERIES_CACHE_KEY = 'search:popular_queries:v1'
+POPULAR_GUEST_QUERIES_CACHE_KEY = 'search:popular_queries:guest:v1'
 
 SEARCH_STOPWORDS = frozenset({'a', 'an', 'the', 'and', 'or', 'in', 'on', 'at', 'to'})
 
@@ -41,6 +42,18 @@ def _trending_days() -> int:
 
 def _popular_days() -> int:
     return getattr(settings, 'SEARCH_POPULAR_DAYS', 30)
+
+
+def _guest_popular_days() -> int:
+    return getattr(settings, 'SEARCH_GUEST_POPULAR_DAYS', 14)
+
+
+def _guest_popular_min_occurrences() -> int:
+    return getattr(settings, 'SEARCH_GUEST_POPULAR_MIN_OCCURRENCES', 2)
+
+
+def _guest_popular_limit() -> int:
+    return getattr(settings, 'SEARCH_GUEST_POPULAR_LIMIT', 10)
 
 
 def _popular_min_occurrences() -> int:
@@ -196,6 +209,64 @@ def get_popular_queries(limit: int = 15) -> dict:
         ).isoformat(),
     }
     cache.set(POPULAR_QUERIES_CACHE_KEY, payload, timeout=_popular_queries_cache_ttl())
+    return payload
+
+
+def get_guest_popular_queries(limit: int | None = None) -> dict:
+    """Популярные запросы среди неавторизованных пользователей.
+
+    Алгоритм:
+    - окно: последние SEARCH_GUEST_POPULAR_DAYS (по умолчанию 14) дней;
+    - только SearchEvent с user=NULL (гость; dedup по IP на record);
+    - группировка по tab + query_normalized;
+    - порог: минимум SEARCH_GUEST_POPULAR_MIN_OCCURRENCES (по умолчанию 2);
+    - ранжирование: count DESC → last_seen DESC → query ASC;
+    - fallback: discover (хэштеги / аккаунты), если данных мало.
+    """
+    from .models import SearchEvent
+
+    limit = limit or _guest_popular_limit()
+    cached = cache.get(POPULAR_GUEST_QUERIES_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    since = timezone.now() - timedelta(days=_guest_popular_days())
+    min_count = _guest_popular_min_occurrences()
+
+    def _rows(tab: str) -> list[str]:
+        qs = (
+            SearchEvent.objects.filter(
+                tab=tab,
+                created_at__gte=since,
+                user__isnull=True,
+            )
+            .values('query_normalized')
+            .annotate(c=Count('id'), last_seen=Max('created_at'))
+            .filter(c__gte=min_count)
+            .order_by('-c', '-last_seen', 'query_normalized')[:limit]
+        )
+        return [r['query_normalized'] for r in qs]
+
+    themes = _rows(SearchEvent.Tab.THEMES)
+    users = _rows(SearchEvent.Tab.USERS)
+
+    if not themes:
+        themes = [f'#{name}' for name in get_popular_hashtags(limit)]
+    if not users:
+        users = list(get_popular_accounts(limit))
+
+    payload = {
+        'themes': themes,
+        'users': users,
+        'cached_until': (
+            timezone.now() + timedelta(seconds=_popular_queries_cache_ttl())
+        ).isoformat(),
+    }
+    cache.set(
+        POPULAR_GUEST_QUERIES_CACHE_KEY,
+        payload,
+        timeout=_popular_queries_cache_ttl(),
+    )
     return payload
 
 

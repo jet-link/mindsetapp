@@ -691,9 +691,14 @@ export const recordSearchEvent = (tab: "themes" | "users", query: string) =>
     body: JSON.stringify({ tab, query }),
   }).catch(() => undefined);
 
+export const getGuestPopularQueries = () =>
+  apiFetch<{ themes: string[]; users: string[] }>(
+    "/api/v1/search/popular/?audience=guest",
+  );
+
 export const searchUsers = (q: string, cursor?: string, signal?: AbortSignal) =>
   apiFetch<CursorPage<UserPublic>>(
-    `/api/v1/users/search/${buildQuery({ q, cursor })}`,
+    `/api/v1/users/search/${buildQuery({ q, cursor, username_only: "1" })}`,
     { signal },
   );
 

@@ -64,10 +64,18 @@ export function updateThemeRepostInFeedCache(
 }
 
 export function prependThemeToFeedCache(theme: Theme) {
-  updateAllCaches((c) => {
-    if (c.themes.some((t) => t.id === theme.id)) return;
-    c.themes = [theme, ...c.themes];
-  });
+  // Своя новая тема — только во вкладку For you, не в Following.
+  const cache = feedCaches["for-you"];
+  if (cache) {
+    if (cache.themes.some((t) => t.id === theme.id)) return;
+    cache.themes = [theme, ...cache.themes];
+    return;
+  }
+  feedCaches["for-you"] = {
+    themes: [theme],
+    nextCursor: null,
+    scrollY: 0,
+  };
 }
 
 export function updateThemeRepliesInFeedCache(themeId: number, repliesCount: number) {

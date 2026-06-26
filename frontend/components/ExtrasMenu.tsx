@@ -85,18 +85,14 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
   const [themeMode, setThemeMode] = useState<ThemeMode>("sun");
   const [languageMode, setLanguageMode] = useState<LanguageMode>("eng");
   const [reportOpen, setReportOpen] = useState(false);
-  const [authed, setAuthed] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const syncAuth = () => {
-      const loggedIn = isLoggedIn();
-      setAuthed(loggedIn);
-      if (!loggedIn) setReportOpen(false);
+    const onAuthChange = () => {
+      if (!isLoggedIn()) setReportOpen(false);
     };
-    syncAuth();
-    window.addEventListener(AUTH_EVENT, syncAuth);
-    return () => window.removeEventListener(AUTH_EVENT, syncAuth);
+    window.addEventListener(AUTH_EVENT, onAuthChange);
+    return () => window.removeEventListener(AUTH_EVENT, onAuthChange);
   }, []);
 
   useEffect(() => {
@@ -150,19 +146,17 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 Language
                 <i className="fa fa-chevron-right" aria-hidden="true" />
               </button>
-              {authed && (
-                <button
-                  type="button"
-                  className="sidenav__extras-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setOpen(false);
-                    setReportOpen(true);
-                  }}
-                >
-                  Report a problem
-                </button>
-              )}
+              <button
+                type="button"
+                className="sidenav__extras-item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  setReportOpen(true);
+                }}
+              >
+                Report a problem
+              </button>
             </>
           ) : panelView === "theme" ? (
             <ExtrasSubpanel title="Theme" onBack={() => setPanelView("menu")}>

@@ -11,6 +11,7 @@ from apps.threads.views import _viewer_context
 
 from .search_services import (
     get_discover,
+    get_guest_popular_queries,
     get_popular_queries,
     record_search_event,
     search_themes_queryset,
@@ -38,7 +39,12 @@ class PopularQueriesView(APIView):
     permission_classes = (permissions.AllowAny,)
 
     def get(self, request):
-        return Response(get_popular_queries())
+        audience = request.query_params.get('audience', '').lower()
+        if audience == 'guest':
+            return Response(get_guest_popular_queries())
+        payload = get_popular_queries()
+        payload['guest'] = get_guest_popular_queries()
+        return Response(payload)
 
 
 class SearchEventCreateView(APIView):
@@ -96,10 +102,7 @@ class RankedUserSearchView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         q = request.query_params.get('q', '').strip()
-        username_only = request.query_params.get('username_only', '').lower() in (
-            '1', 'true', 'yes',
-        )
         response = super().list(request, *args, **kwargs)
-        if q and not username_only:
+        if q:
             record_search_event(request, 'users', q)
         return response

@@ -9,6 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { MediaItem } from "@/lib/api";
+import { isGifMedia } from "@/lib/media-types";
 
 function ArrowIcon({ dir }: { dir: "prev" | "next" }) {
   // Простая линейная стрелка (как в макете), без font-awesome.
@@ -154,19 +155,22 @@ export default function MediaLightbox({
         ref={scrollRef}
         onScroll={onScroll}
       >
-        {media.map((m) => (
+        {media.map((m) => {
+          const animated = isGifMedia(m);
+          return (
           <div className="media-lightbox__slide" key={m.key ?? m.id}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               className="media-lightbox__img"
-              src={m.url || m.medium_url}
-              srcSet={m.srcset || undefined}
+              src={animated ? m.url : (m.url || m.medium_url)}
+              srcSet={animated ? undefined : (m.srcset || undefined)}
               sizes="100vw"
               alt=""
               draggable={false}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {hasNav && index < last && (

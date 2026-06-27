@@ -908,6 +908,14 @@ export default function ProfileTabs({
               ? { ...r, theme: { ...r.theme, is_liked: liked, likes_count } }
               : r,
           ),
+          // Срез reposts тоже держим в актуальном состоянии: иначе repost-патч
+          // (patchThemeRepostFlags) пересоберёт карточку со старым is_liked и
+          // через prop-sync вернёт лайку устаревшее значение.
+          reposts: slice.reposts.map((item) =>
+            item.kind === "theme" && item.theme?.id === themeId
+              ? { ...item, theme: { ...item.theme, is_liked: liked, likes_count } }
+              : item,
+          ),
         })),
       );
     };
@@ -988,6 +996,12 @@ export default function ProfileTabs({
           ...slice,
           replies: slice.replies.map((r) =>
             r.id === replyId ? { ...r, is_liked: liked, likes_count } : r,
+          ),
+          // Аналогично темам: держим reposts-срез синхронным по лайку ответа.
+          reposts: slice.reposts.map((item) =>
+            item.kind === "reply" && item.reply?.id === replyId
+              ? { ...item, reply: { ...item.reply, is_liked: liked, likes_count } }
+              : item,
           ),
         })),
       );

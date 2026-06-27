@@ -310,16 +310,16 @@ export default function Feed() {
     const onFollow = (e: Event) => {
       const { profileUsername, following } = (e as CustomEvent<FollowChangedDetail>).detail;
       if (following === true) {
-        const cache = getFeedCache("following");
-        if (!cache?.themes.length) return;
+        // Кэш Following уже сброшен в emitFollowChanged. Помечаем срез на
+        // перезагрузку (старые темы остаются на экране, без мигания), а если
+        // вкладка сейчас активна — сразу подтягиваем свежий список с сервера.
         setSlices((prev) => ({
           ...prev,
-          following: {
-            themes: cache.themes,
-            nextCursor: prev.following.nextCursor ?? cache.nextCursor,
-            loaded: true,
-          },
+          following: { ...prev.following, loaded: false },
         }));
+        if (tabRef.current === "following") {
+          load("following", undefined, true);
+        }
         return;
       }
       if (following !== false) return;
@@ -336,7 +336,7 @@ export default function Feed() {
     };
     window.addEventListener(FOLLOW_EVENT, onFollow);
     return () => window.removeEventListener(FOLLOW_EVENT, onFollow);
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     const onThemeLike = (e: Event) => {

@@ -17,7 +17,7 @@ import {
   updateThemeLikeInFeedCache,
   updateThemeRepostInFeedCache,
   removeAuthorFromFollowingFeedCache,
-  addAuthorThemesToFollowingFeedCache,
+  invalidateFollowingFeedCache,
   removeThemeFromFeedCache,
   clearFeedCache,
 } from "./feed-cache";
@@ -74,6 +74,7 @@ export interface MediaItem {
   width: number | null;
   height: number | null;
   orientation_kind: string;
+  mime?: string;
   url: string;
   thumbnail_url: string;
   medium_url: string;
@@ -618,15 +619,13 @@ export function emitFollowChanged(detail: FollowChangedDetail) {
   }
 
   if (detail.following === true) {
-    void getUserThemes(detail.profileUsername)
-      .then((page) => {
-        if (page.results.length) {
-          addAuthorThemesToFollowingFeedCache(page.results);
-        }
-      })
-      .finally(() => {
-        window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
-      });
+    // Лента Following формируется и пагинируется на сервере. Клиентская
+    // склейка тем нового автора давала неполный список (лишь первую страницу)
+    // и помечала срез как полностью загруженный — из-за чего вкладка не
+    // дозапрашивала остальное с сервера. Сбрасываем кэш, чтобы при открытии
+    // вкладки подтянулся полный свежий список.
+    invalidateFollowingFeedCache();
+    window.dispatchEvent(new CustomEvent(FOLLOW_EVENT, { detail }));
     return;
   }
 

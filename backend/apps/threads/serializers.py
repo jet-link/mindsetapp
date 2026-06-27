@@ -16,6 +16,7 @@ class MediaSerializer(serializers.Serializer):
     width = serializers.IntegerField(read_only=True, allow_null=True)
     height = serializers.IntegerField(read_only=True, allow_null=True)
     orientation_kind = serializers.CharField(read_only=True)
+    mime = serializers.CharField(read_only=True, allow_blank=True)
     url = serializers.CharField(source='get_url', read_only=True)
     thumbnail_url = serializers.CharField(source='get_thumbnail_url', read_only=True)
     medium_url = serializers.CharField(source='get_medium_url', read_only=True)

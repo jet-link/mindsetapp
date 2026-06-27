@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { MediaItem } from "@/lib/api";
+import { isGifMedia } from "@/lib/media-types";
 import { saveReturnAnchor } from "@/lib/return-anchor";
 
 /** Сетка медиа профиля: клик ведёт к теме или ответу-источнику. */
@@ -32,7 +33,9 @@ export default function ProfileMediaGrid({
 
   return (
     <div className="media-grid">
-      {items.map((m) => (
+      {items.map((m) => {
+        const animated = isGifMedia(m);
+        return (
         <button
           key={m.key ?? m.id}
           type="button"
@@ -42,14 +45,15 @@ export default function ProfileMediaGrid({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={m.thumbnail_url || m.medium_url || m.url}
-            srcSet={m.srcset || undefined}
+            src={animated ? m.url : (m.thumbnail_url || m.medium_url || m.url)}
+            srcSet={animated ? undefined : (m.srcset || undefined)}
             sizes="(max-width: 620px) 33vw, 200px"
             alt=""
             loading="lazy"
           />
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -18,6 +18,7 @@ from apps.core.images import (
     compute_orientation_kind,
     process_uploaded_files_parallel,
 )
+from apps.core.mime import ALLOWED_IMAGE_MIME, resolve_image_content_type
 
 from .models import Reply, ReplyMedia, Theme, ThemeMedia
 
@@ -31,9 +32,6 @@ MAX_REPLY_MEDIA = 5
 MAX_MEDIA_IMAGE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 # image/gif хранится без конвертации (анимация), остальные → WebP.
-ALLOWED_IMAGE_MIME = frozenset({
-    'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
-})
 PASSTHROUGH_IMAGE_MIME = frozenset({'image/gif'})
 
 
@@ -51,8 +49,21 @@ def _image_dimensions(raw: bytes) -> tuple[int | None, int | None]:
         return None, None
 
 
+def _read_head(f, n: int = 16) -> bytes:
+    pos = getattr(f, 'tell', lambda: 0)()
+    try:
+        f.seek(0)
+        head = f.read(n)
+        f.seek(pos)
+        return head or b''
+    except Exception:  # noqa: BLE001
+        return b''
+
+
 def _classify(f) -> tuple[str | None, int, str]:
-    ct = (getattr(f, 'content_type', None) or '').lower().strip()
+    name = os.path.basename(getattr(f, 'name', '') or '') or 'upload.bin'
+    declared = (getattr(f, 'content_type', None) or '').lower().strip()
+    ct = resolve_image_content_type(declared, head=_read_head(f), filename=name) or declared
     if ct in ALLOWED_IMAGE_MIME:
         return 'image', MAX_MEDIA_IMAGE_BYTES, ct
     return None, 0, ct
@@ -129,15 +140,18 @@ def _attach(model, parent_field: str, parent, files: Sequence, *, limit: int, it
         if ct in PASSTHROUGH_IMAGE_MIME:
             f.seek(0)
             raw = f.read()
+            verified = resolve_image_content_type(ct, head=raw[:16], filename=name)
+            if verified != 'image/gif':
+                raise MindsetMediaError(f'Unsupported file type: {name}')
             w, h = _image_dimensions(raw)
             model.objects.create(
                 **base,
                 kind='image',
-                image=ContentFile(raw, name=name or 'image.gif'),
+                image=ContentFile(raw, name=name if name.lower().endswith('.gif') else 'image.gif'),
                 width=w,
                 height=h,
                 orientation_kind=compute_orientation_kind(w, h),
-                mime=ct,
+                mime='image/gif',
             )
         else:
             p = processed.get(idx)

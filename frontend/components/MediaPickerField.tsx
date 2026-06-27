@@ -12,9 +12,8 @@ import {
   type MediaLimitKind,
   mediaLimitExceededMessage,
 } from "@/lib/media-limit";
+import { isAllowedImageFile, MEDIA_ACCEPT } from "@/lib/media-types";
 
-const ACCEPT = "image/jpeg,image/jpg,image/png,image/webp,image/gif";
-const ALLOWED_PREFIXES = ["image/"];
 const REMOVE_ANIM_MS = 200;
 
 let nextItemId = 0;
@@ -43,9 +42,7 @@ export function useMediaPicker(max: number, kind: MediaLimitKind): MediaPicker {
 
   const addFiles = useCallback((selected: FileList | null) => {
     if (!selected || selected.length === 0) return;
-    const incoming = Array.from(selected).filter((f) =>
-      ALLOWED_PREFIXES.some((p) => f.type.startsWith(p)),
-    );
+    const incoming = Array.from(selected).filter(isAllowedImageFile);
     if (incoming.length === 0) {
       setTypeError("Unsupported file type.");
       return;
@@ -93,7 +90,7 @@ export function MediaAttachButton({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
+        accept={MEDIA_ACCEPT}
         multiple
         className="sr-only"
         onChange={(e) => {
@@ -105,8 +102,8 @@ export function MediaAttachButton({
         type="button"
         className="icon-btn"
         disabled={disabled}
-        title={atLimit ? `Max ${picker.max} photos` : "Attach photo"}
-        aria-label="Attach photo"
+        title={atLimit ? `Max ${picker.max} items` : "Attach photo or GIF"}
+        aria-label="Attach photo or GIF"
         onClick={() => inputRef.current?.click()}
       >
         <i className="fa fa-paperclip" aria-hidden="true" />

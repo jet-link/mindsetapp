@@ -120,16 +120,37 @@ export default function ReplyCard({
       router.push("/login");
       return;
     }
+    // Оптимистично: обновляем UI сразу, не дожидаясь ответа сервера.
+    const prevLiked = liked;
+    const prevLikes = likes;
+    const nextLiked = !prevLiked;
+    const nextLikes = Math.max(0, prevLikes + (nextLiked ? 1 : -1));
+    setLiked(nextLiked);
+    setLikes(nextLikes);
+    emitReplyLikeChanged({
+      replyId: reply.id,
+      liked: nextLiked,
+      likes_count: nextLikes,
+    });
     try {
       const r = await toggleReplyLike(reply.id);
       setLiked(r.liked);
       setLikes(r.likes_count);
+      if (r.liked !== nextLiked || r.likes_count !== nextLikes) {
+        emitReplyLikeChanged({
+          replyId: reply.id,
+          liked: r.liked,
+          likes_count: r.likes_count,
+        });
+      }
+    } catch {
+      setLiked(prevLiked);
+      setLikes(prevLikes);
       emitReplyLikeChanged({
         replyId: reply.id,
-        liked: r.liked,
-        likes_count: r.likes_count,
+        liked: prevLiked,
+        likes_count: prevLikes,
       });
-    } catch {
       window.location.href = "/login";
     }
   }

@@ -62,6 +62,11 @@ export function updateThemeLikeInProfileCache(
         ? { ...r, theme: { ...r.theme, is_liked: liked, likes_count: likesCount } }
         : r,
     ),
+    reposts: slice.reposts.map((item) =>
+      item.kind === "theme" && item.theme?.id === themeId
+        ? { ...item, theme: { ...item.theme, is_liked: liked, likes_count: likesCount } }
+        : item,
+    ),
   }));
 }
 
@@ -120,6 +125,11 @@ export function updateReplyLikeInProfileCache(replyId: number, liked: boolean, l
     ...slice,
     replies: slice.replies.map((r) =>
       r.id === replyId ? { ...r, is_liked: liked, likes_count: likesCount } : r,
+    ),
+    reposts: slice.reposts.map((item) =>
+      item.kind === "reply" && item.reply?.id === replyId
+        ? { ...item, reply: { ...item.reply, is_liked: liked, likes_count: likesCount } }
+        : item,
     ),
   }));
 }

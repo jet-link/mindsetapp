@@ -86,33 +86,11 @@ export function removeAuthorFromFollowingFeedCache(username: string) {
   cache.themes = cache.themes.filter((t) => t.author.username !== username);
 }
 
-function sortThemesByDate(themes: Theme[]): Theme[] {
-  return [...themes].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-}
-
-/** Добавляет темы нового followee во вкладку Following (хронологически). */
-export function addAuthorThemesToFollowingFeedCache(themes: Theme[]) {
-  if (!themes.length) return;
-  const existing = feedCaches["following"];
-  if (!existing) {
-    feedCaches["following"] = {
-      themes: sortThemesByDate(themes),
-      nextCursor: null,
-      scrollY: 0,
-    };
-    return;
-  }
-  const ids = new Set(existing.themes.map((t) => t.id));
-  const merged = [...existing.themes];
-  for (const theme of themes) {
-    if (!ids.has(theme.id)) {
-      merged.push(theme);
-      ids.add(theme.id);
-    }
-  }
-  existing.themes = sortThemesByDate(merged);
+/** Сбрасывает кэш вкладки Following, чтобы при следующем открытии она
+ * подтянула полный актуальный список с сервера (источник правды по
+ * хронологии и пагинации). Используется при подписке на нового автора. */
+export function invalidateFollowingFeedCache() {
+  delete feedCaches["following"];
 }
 
 export function updateAuthorAvatarInFeedCache(username: string, avatar: string | null) {

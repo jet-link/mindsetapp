@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MediaItem } from "@/lib/api";
+import { isGifMedia } from "@/lib/media-types";
 import MediaLightbox from "@/components/MediaLightbox";
 
 function aspectStyle(m: MediaItem): React.CSSProperties {
@@ -27,6 +28,10 @@ function MediaThumb({
   onOpen: () => void;
   wide?: boolean;
 }) {
+  const animated = isGifMedia(m);
+  const src = animated ? m.url : (m.medium_url || m.url);
+  const srcSet = animated ? undefined : (m.srcset || undefined);
+
   return (
     <button
       type="button"
@@ -36,12 +41,12 @@ function MediaThumb({
         e.stopPropagation();
         onOpen();
       }}
-      aria-label="Open image"
+      aria-label={animated ? "Open GIF" : "Open image"}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={m.medium_url || m.url}
-        srcSet={m.srcset || undefined}
+        src={src}
+        srcSet={srcSet}
         sizes={wide ? "100vw" : "(max-width: 620px) 70vw, 360px"}
         alt=""
       />

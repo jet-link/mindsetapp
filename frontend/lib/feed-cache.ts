@@ -74,8 +74,13 @@ function clearDisk(tab?: string) {
   }
 }
 
-/** Один раз за сессию поднимаем дисковый кэш в память (для мгновенного показа). */
-function ensureDiskHydrated() {
+/**
+ * Один раз за сессию поднимаем дисковый кэш в память (для мгновенного показа).
+ * ВАЖНО: вызывать только после монтирования (в useEffect), а не во время рендера
+ * — иначе серверный HTML (без localStorage) не совпадёт с клиентским и будет
+ * ошибка гидрации.
+ */
+export function hydrateFeedCacheFromDisk() {
   if (diskHydrated || typeof window === "undefined") return;
   diskHydrated = true;
   for (const tab of DISK_TABS) {
@@ -90,7 +95,6 @@ function ensureDiskHydrated() {
 
 /** Была ли вкладка поднята именно из дискового кэша (стейл, нужна ревалидация). */
 export function wasHydratedFromDisk(tab: string): boolean {
-  ensureDiskHydrated();
   return hydratedFromDisk.has(tab);
 }
 
@@ -108,7 +112,6 @@ export function setLastFeedTab(tab: string) {
 }
 
 export function getFeedCache(tab: string = lastTab): FeedSnapshot | null {
-  ensureDiskHydrated();
   return feedCaches[tab] ?? null;
 }
 

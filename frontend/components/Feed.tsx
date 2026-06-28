@@ -34,6 +34,7 @@ import {
   getLastFeedTab,
   setLastFeedTab,
   removeAuthorFromFollowingFeedCache,
+  hydrateFeedCacheFromDisk,
   wasHydratedFromDisk,
   markFeedRevalidated,
 } from "@/lib/feed-cache";
@@ -345,6 +346,35 @@ export default function Feed() {
       return changed ? next : prev;
     });
   }, [pathname]);
+
+  // Дисковый кэш поднимаем только ПОСЛЕ монтирования (не во время рендера),
+  // иначе серверный HTML без localStorage не совпадёт с клиентским (гидрация).
+  // Должен идти ДО эффекта load(), чтобы тот не слал лишний запрос по вкладке,
+  // которую мы только что показали из кэша.
+  useEffect(() => {
+    hydrateFeedCacheFromDisk();
+    let hydrated = false;
+    const next = { ...slicesRef.current };
+    for (const tabId of ALL_TABS) {
+      if (next[tabId].loaded) continue;
+      const cache = getFeedCache(tabId);
+      if (cache && cache.themes.length) {
+        next[tabId] = {
+          themes: cache.themes,
+          nextCursor: cache.nextCursor,
+          loaded: true,
+        };
+        hydrated = true;
+      }
+    }
+    if (hydrated) {
+      // Обновляем ref синхронно, чтобы эффект load() ниже увидел loaded=true.
+      slicesRef.current = next;
+      setSlices(next);
+      setLoadingTab((cur) => (cur && next[cur].loaded ? null : cur));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     load(tab);

@@ -203,6 +203,19 @@ export default function ReplyCard({
     router.push(`/reply/${reply.id}`);
   }
 
+  // Badge «Reply» (вкладка Reposts): ведёт к контексту репостнутого ответа —
+  // на родительский ответ (ответ ответа) или на тему (ответ темы).
+  function onBadgeNavigate(e: MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    saveReturnAnchor({ kind: "reply", id: reply.id });
+    if (reply.parent_id != null) {
+      router.push(`/reply/${reply.parent_id}`);
+    } else {
+      router.push(`/thread/${reply.theme_id}`);
+    }
+  }
+
   function onReplies() {
     openReplyThread();
   }
@@ -247,7 +260,18 @@ export default function ReplyCard({
             </Link>
             <span className="time">· {reply.human_published}</span>
             {showReplyBadge && <span className="time">·</span>}
-            {showReplyBadge && <span className="card-badge">Reply</span>}
+            {showReplyBadge && (
+              <button
+                type="button"
+                className="card-badge card-badge--btn"
+                onClick={onBadgeNavigate}
+                aria-label={
+                  reply.parent_id != null ? "Open parent reply" : "Open theme"
+                }
+              >
+                Reply
+              </button>
+            )}
           </div>
           <CardMenu
             kind="reply"

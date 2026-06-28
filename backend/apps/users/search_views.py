@@ -11,8 +11,6 @@ from apps.threads.views import _viewer_context
 
 from .search_services import (
     get_discover,
-    get_guest_popular_queries,
-    get_popular_queries,
     record_search_event,
     search_themes_queryset,
     search_users_queryset,
@@ -31,20 +29,6 @@ class DiscoverSearchView(APIView):
         if mode not in ('popular', 'trending'):
             mode = 'popular'
         return Response(get_discover(mode))
-
-
-class PopularQueriesView(APIView):
-    """GET /search/popular/ — частые поисковые запросы из analytics."""
-
-    permission_classes = (permissions.AllowAny,)
-
-    def get(self, request):
-        audience = request.query_params.get('audience', '').lower()
-        if audience == 'guest':
-            return Response(get_guest_popular_queries())
-        payload = get_popular_queries()
-        payload['guest'] = get_guest_popular_queries()
-        return Response(payload)
 
 
 class SearchEventCreateView(APIView):

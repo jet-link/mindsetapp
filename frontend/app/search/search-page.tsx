@@ -13,7 +13,6 @@ import {
   UserProfileUpdatedDetail,
   AUTH_EVENT,
   getStoredUsername,
-  getGuestPopularQueries,
   isLoggedIn,
   searchThemes,
   searchUsers,
@@ -76,11 +75,6 @@ export default function SearchPage() {
   const [themeNextCursor, setThemeNextCursor] = useState<string | null>(null);
   const [userNextCursor, setUserNextCursor] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
-  const [popularQueries, setPopularQueries] = useState<{ themes: string[]; users: string[] }>({
-    themes: [],
-    users: [],
-  });
-  const [popularLoading, setPopularLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -114,25 +108,6 @@ export default function SearchPage() {
     window.addEventListener(AUTH_EVENT, syncAuth);
     return () => window.removeEventListener(AUTH_EVENT, syncAuth);
   }, []);
-
-  useEffect(() => {
-    if (authed) return;
-    let cancelled = false;
-    setPopularLoading(true);
-    getGuestPopularQueries()
-      .then((data) => {
-        if (!cancelled) setPopularQueries(data);
-      })
-      .catch(() => {
-        if (!cancelled) setPopularQueries({ themes: [], users: [] });
-      })
-      .finally(() => {
-        if (!cancelled) setPopularLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authed]);
 
   useEffect(() => {
     const onProfileUpdated = (e: Event) => {
@@ -351,33 +326,23 @@ export default function SearchPage() {
   }
 
   function recordResultClick(activeTab: SearchTab) {
+    if (!authed) return;
     const q = queryRef.current.trim();
     if (q.length < MIN_QUERY_LEN) return;
     const owner = ownerRef.current;
+    if (!owner) return;
     pushRecentSearch(owner, activeTab, q);
     setRecentSearches(readRecentSearches(owner));
   }
 
-  function applyPopularChip(activeTab: SearchTab, q: string) {
-    setTab(activeTab);
-    setQuery(activeTab === "users" ? `@${q.replace(/^@+/, "")}` : q);
-  }
-
-  function formatPopularLabel(activeTab: SearchTab, q: string): string {
-    if (activeTab === "users") return `@${q.replace(/^@+/, "")}`;
-    return q;
-  }
-
   const recentItems = recentSearches.filter((item) => item.tab === tab);
-  const popularItems = tab === "themes" ? popularQueries.themes : popularQueries.users;
   const showRecentSection = showDiscover && authed;
-  const showPopularSection = showDiscover && !authed;
 
   const searchLabel =
     tab === "themes" ? "Search themes or hashtags" : "Search users or @username";
 
   return (
-    <main className={`search-page${showDiscover ? " search-page--discover" : ""}`}>
+    <main className={`search-page${showRecentSection ? " search-page--discover" : ""}`}>
       <PageHeader title="Search" showBack={false} />
 
       <div role="tablist" aria-label="Search type" className="search-tabs">
@@ -426,38 +391,12 @@ export default function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
           autoComplete="off"
           spellCheck={false}
-          aria-controls={showDiscover ? undefined : resultsPanelId}
+          aria-controls={showRecentSection ? undefined : resultsPanelId}
         />
         {fetching && (
           <span className="search-bar__spinner" role="status" aria-label="Searching" />
         )}
       </form>
-
-      {showPopularSection && (
-        <div className="discover-search">
-          <div className="discover-search__group">
-            <span className="discover-search__label">Popular searches</span>
-            {popularLoading ? (
-              <p className="discover-search__empty muted">Loading…</p>
-            ) : popularItems.length > 0 ? (
-              <div className="discover-search__chips">
-                {popularItems.map((item) => (
-                  <button
-                    key={`popular-${tab}-${item}`}
-                    type="button"
-                    className="discover-search__chip"
-                    onClick={() => applyPopularChip(tab, item)}
-                  >
-                    {formatPopularLabel(tab, item)}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="discover-search__empty muted">No popular searches yet.</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {showRecentSection && (
         <div className="discover-search">

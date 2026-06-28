@@ -5,17 +5,16 @@ export type RecentSearch = {
 };
 
 const RECENT_KEY_PREFIX = "mindset-search-recent";
-const GUEST_OWNER = "__guest__";
 const RECENT_MAX = 15;
 const RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Личное хранилище: у каждого пользователя своя история, у гостей — отдельная. */
-function recentKey(owner: string | null): string {
-  return `${RECENT_KEY_PREFIX}:${owner ?? GUEST_OWNER}`;
+/** Личное хранилище: только для авторизованных пользователей. */
+function recentKey(owner: string): string {
+  return `${RECENT_KEY_PREFIX}:${owner}`;
 }
 
 function parseRecentRaw(owner: string | null): RecentSearch[] {
-  if (typeof window === "undefined") return [];
+  if (!owner || typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(recentKey(owner));
     if (!raw) return [];
@@ -33,7 +32,7 @@ function parseRecentRaw(owner: string | null): RecentSearch[] {
   }
 }
 
-function writeRecentRaw(owner: string | null, items: RecentSearch[]) {
+function writeRecentRaw(owner: string, items: RecentSearch[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(recentKey(owner), JSON.stringify(items));
@@ -43,6 +42,7 @@ function writeRecentRaw(owner: string | null, items: RecentSearch[]) {
 }
 
 export function readRecentSearches(owner: string | null): RecentSearch[] {
+  if (!owner) return [];
   const now = Date.now();
   const raw = parseRecentRaw(owner);
   const items = raw
@@ -67,6 +67,7 @@ export function pushRecentSearch(
   tab: "themes" | "users",
   query: string,
 ) {
+  if (!owner) return;
   const trimmed = query.trim();
   if (trimmed.length < 2) return;
 
@@ -82,6 +83,7 @@ export function pushRecentSearch(
 }
 
 export function clearRecentSearches(owner: string | null, tab: "themes" | "users") {
+  if (!owner) return;
   const now = Date.now();
   const items = parseRecentRaw(owner)
     .filter((item) => now - item.at < RECENT_TTL_MS)
@@ -94,6 +96,7 @@ export function removeRecentSearch(
   tab: "themes" | "users",
   query: string,
 ) {
+  if (!owner) return;
   const trimmed = query.trim();
   if (trimmed.length < 2) return;
   const normalized = trimmed.toLowerCase();

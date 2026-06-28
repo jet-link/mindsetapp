@@ -122,17 +122,6 @@ class UserSearchView(generics.ListAPIView):
         return {**super().get_serializer_context(), **_following_ids_context(self)}
 
 
-class PopularSearchView(APIView):
-    """Deprecated: GET /search/popular/ перенесён в PopularQueriesView."""
-
-    permission_classes = (permissions.AllowAny,)
-
-    def get(self, request):
-        from .search_services import get_popular_queries
-
-        return Response(get_popular_queries())
-
-
 class MeView(generics.RetrieveUpdateAPIView):
     """GET/PATCH /me/ — свой профиль (avatar, bio)."""
 

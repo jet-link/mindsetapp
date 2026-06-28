@@ -19,14 +19,19 @@ export default function ProfileMediaGrid({
 
   const listKey = `/u/${username}?tab=media`;
 
-  function openSource(m: MediaItem) {
+  function openSource(m: MediaItem, el: HTMLElement) {
+    // Якорь на саму медиакарточку + её позиция на экране — для пиксель-точного возврата.
+    saveReturnAnchor({
+      listKey,
+      kind: "media",
+      id: m.id,
+      viewportTop: el.getBoundingClientRect().top,
+    });
     if (m.reply_id) {
-      saveReturnAnchor({ listKey, kind: "reply", id: m.reply_id });
       router.push(`/reply/${m.reply_id}`);
       return;
     }
     if (m.theme_id) {
-      saveReturnAnchor({ listKey, kind: "theme", id: m.theme_id });
       router.push(`/thread/${m.theme_id}`);
     }
   }
@@ -40,7 +45,8 @@ export default function ProfileMediaGrid({
           key={m.key ?? m.id}
           type="button"
           className="media-grid__item"
-          onClick={() => openSource(m)}
+          data-anchor-media={m.id}
+          onClick={(e) => openSource(m, e.currentTarget)}
           aria-label="Open post"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

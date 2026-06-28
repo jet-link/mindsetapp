@@ -454,6 +454,11 @@ a { color: inherit; text-decoration: none; }
   content: "\f185";
 }
 
+/* Font Awesome 4: outline plane alias (same glyph as fa-paper-plane-o) */
+.fa-plane-o:before {
+  content: "\f1d9";
+}
+
 /* Поисковая строка */
 .search-bar {
   display: flex;
@@ -798,7 +803,7 @@ a { color: inherit; text-decoration: none; }
   padding: 12px 0;
   font-weight: 700;
   color: var(--text-dim);
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
 }
 .tabs a.active,
 .tabs button.active { color: var(--text); border-bottom-color: var(--text); }
@@ -834,7 +839,7 @@ a { color: inherit; text-decoration: none; }
 .card {
   display: flex;
   gap: 10px;
-  padding: var(--card-pad-x) 5px;
+  padding: var(--card-pad-x) 0;
   /* border-bottom: 1px solid var(--border); */
   background: transparent;
 }
@@ -872,8 +877,8 @@ a { color: inherit; text-decoration: none; }
 .card-menu__trigger {
   all: unset;
   cursor: pointer;
-  width: 32px;
-  height: 32px;
+  width: 35px;
+  height: 35px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -917,9 +922,15 @@ a { color: inherit; text-decoration: none; }
   font-size: 14px;
 }
 .card-menu__item:hover { background: var(--bubble); }
+.card-menu__item:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.card-menu__item:disabled:hover { background: transparent; }
 .card-menu__item--danger { color: var(--error); }
 .card-menu__item--danger .fa { color: var(--error); }
 .card-menu__item--danger:hover { background: color-mix(in srgb, var(--error) 8%, var(--surface)); }
+.card-menu__item--danger:disabled:hover { background: transparent; }
 
 .body-html--clickable {
   cursor: pointer;
@@ -1070,7 +1081,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--surface);
   border: 1px solid var(--border);
   object-fit: cover;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
@@ -1182,7 +1193,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 15px 5px;
+  padding: 15px 0;
   margin-bottom: 10px;
   /* border-bottom: 1px solid var(--border); */
 }
@@ -1446,7 +1457,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .profile-info { flex: 1; min-width: 0; }
 .profile-head h1 { margin: 0; font-size: 26px; line-height: 1.2; }
 .profile-handle {
-  margin: 5px 0;
+  margin: 0;
   font-size: 14px;
   line-height: 1.2;
   color: var(--text-dim);
@@ -1454,15 +1465,44 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .profile-bio { margin: 0; white-space: pre-wrap; }
 .profile-head__details .stats {
   color: var(--text-dim);
-  margin-top: 14px;
+  margin-top: 0;
   font-size: 14px;
   display: flex;
   align-items: center;
   gap: 4px;
 }
+.profile-head__stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.profile-head__tools {
+  display: flex;
+  align-items: center;
+  /* gap: 2px; */
+  flex-shrink: 0;
+}
+.profile-head__tool-btn {
+  all: unset;
+  cursor: pointer;
+  width: 35px;
+  height: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-dim);
+  font-size: 16px;
+}
+.profile-head__tool-btn:hover {
+  background: var(--bubble);
+  color: var(--text);
+}
 .profile-head .stats {
   color: var(--text-dim);
-  margin-top: 14px;
+  margin-top: 0;
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -1640,7 +1680,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   /* padding: 15px 0; */
 }
 .thread-chain .card {
-  padding: var(--card-pad-x) 5px;
+  padding: var(--card-pad-x) 0;
 }
 .thread-chain .card-avatar-col--line .card-thread-line {
   position: absolute;
@@ -1666,7 +1706,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .thread-replies-label {
   display: flex;
   /* gap: 10px; */
-  padding: var(--thread-gap) 5px;
+  padding: var(--thread-gap) 0;
   align-items: center;
 }
 .thread-replies-label__line-col {
@@ -1792,7 +1832,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   display: flex;
   align-items: center;
   min-height: 40px;
-  padding-left: 5px;
+  /* padding-left: 5px; */
   margin: 20px 0;
 }
 .page-title {
@@ -1936,7 +1976,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .profile-edit-btn {
   cursor: pointer;
   display: inline-block;
-  margin-top: 14px;
+  margin-top: 10px;
   padding: 7px 14px;
   font: inherit;
   font-size: 14px;

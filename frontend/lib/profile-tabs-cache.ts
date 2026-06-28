@@ -117,6 +117,21 @@ export function updateThemeRepliesInProfileCache(
       }
       return next;
     }),
+    reposts: slice.reposts.map((item) => {
+      if (item.kind === "theme" && item.theme?.id === themeId) {
+        return { ...item, theme: { ...item.theme, replies_count: themeRepliesCount } };
+      }
+      if (
+        item.kind === "reply" &&
+        item.reply &&
+        parentId != null &&
+        item.reply.id === parentId &&
+        parentRepliesCount !== undefined
+      ) {
+        return { ...item, reply: { ...item.reply, replies_count: parentRepliesCount } };
+      }
+      return item;
+    }),
   }));
 }
 

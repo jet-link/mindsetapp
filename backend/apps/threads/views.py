@@ -270,9 +270,6 @@ class ThemeViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def replies(self, request, pk=None):
-        wait = cooldown_retry_after(request.user, **REPLY_COOLDOWN)
-        if wait:
-            return _cooldown_response(wait, 'replying')
         theme = self.get_object()
         ser = ReplyCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -286,6 +283,14 @@ class ThemeViewSet(viewsets.GenericViewSet):
         parent_id = ser.validated_data.get('parent_id')
         if parent_id:
             parent = get_object_or_404(Reply, pk=parent_id, theme=theme, is_deleted=False)
+        # Кулдаун точечный: по конкретному адресату (ответ ответу / ответ теме),
+        # чтобы ответ одной теме/ответу не блокировал формы других.
+        cooldown_target = f'reply:{parent.pk}' if parent else f'theme:{theme.pk}'
+        wait = cooldown_retry_after(
+            request.user, **REPLY_COOLDOWN, target=cooldown_target
+        )
+        if wait:
+            return _cooldown_response(wait, 'replying')
         try:
             reply = services.create_reply(
                 theme=theme,

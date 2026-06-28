@@ -31,7 +31,8 @@ export default function ReplyForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const cooldown = useCooldown("reply");
+  const cooldownTarget = parentId ? `reply:${parentId}` : `theme:${themeId}`;
+  const cooldown = useCooldown("reply", cooldownTarget);
   const picker = useMediaPicker(5, "reply");
 
   const chars = themeCharCount(body);

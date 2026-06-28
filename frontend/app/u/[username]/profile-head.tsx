@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import BioText, { bioCharCount } from "@/components/BioText";
 import Avatar from "@/components/Avatar";
 import ProfileStats from "./profile-stats";
+import ProfileHeadTools from "./profile-head-tools";
 import {
   deleteMeAvatar,
   emitUserProfileUpdated,
@@ -182,7 +183,10 @@ export default function ProfileHead({
               </button>
             )
           )}
-          <ProfileStats username={username} followers={followers} following={following} />
+          <div className="profile-head__stats-row">
+            <ProfileStats username={username} followers={followers} following={following} />
+            <ProfileHeadTools username={username} />
+          </div>
         </div>
 
         {isOwn && (

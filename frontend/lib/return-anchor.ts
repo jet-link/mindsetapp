@@ -1,10 +1,12 @@
-export type AnchorKind = "theme" | "reply";
+export type AnchorKind = "theme" | "reply" | "media";
 
 export interface ReturnAnchor {
   listKey: string;
   kind: AnchorKind;
   id: number;
   savedAt: number;
+  /** Позиция верха карточки в окне в момент ухода — для пиксель-точного возврата. */
+  viewportTop?: number;
 }
 
 const ANCHOR_TTL_MS = 5 * 60_000;
@@ -67,6 +69,7 @@ export function saveReturnAnchor(anchor: {
   listKey?: string;
   kind: AnchorKind;
   id: number;
+  viewportTop?: number;
 }) {
   const listKey = anchor.listKey ?? currentListKey;
   anchors.set(listKey, {
@@ -74,6 +77,7 @@ export function saveReturnAnchor(anchor: {
     kind: anchor.kind,
     id: anchor.id,
     savedAt: Date.now(),
+    viewportTop: anchor.viewportTop,
   });
 }
 
@@ -95,12 +99,35 @@ function findAnchorElement(kind: AnchorKind, id: number): HTMLElement | null {
   return nodes[0] ?? null;
 }
 
-/** Мгновенно центрирует карточку в окне (без smooth-scroll). */
-export function scrollToAnchor(anchor: ReturnAnchor): boolean {
+/** Высота видимого фиксированного хедера (моб.) — чтобы карточка не ушла под него. */
+function topInset(): number {
+  if (typeof document === "undefined") return 0;
+  const header = document.querySelector<HTMLElement>(".mobile-header");
+  if (!header || getComputedStyle(header).display === "none") return 0;
+  return Math.max(0, header.getBoundingClientRect().bottom);
+}
+
+/**
+ * Целевой scrollTop для якоря или null, если элемент ещё не в DOM.
+ * Если сохранён viewportTop — карточка встаёт ровно на ту же высоту экрана,
+ * где была в момент ухода (пиксель-точно), иначе центрируется в окне.
+ */
+export function computeAnchorTop(anchor: ReturnAnchor): number | null {
   const el = findAnchorElement(anchor.kind, anchor.id);
-  if (!el) return false;
+  if (!el) return null;
   const rect = el.getBoundingClientRect();
-  const top = rect.top + window.scrollY - (window.innerHeight - rect.height) / 2;
-  window.scrollTo({ top: Math.max(0, top), left: 0, behavior: "auto" });
+  const absTop = rect.top + window.scrollY;
+  const top =
+    typeof anchor.viewportTop === "number"
+      ? absTop - Math.max(anchor.viewportTop, topInset() + 4)
+      : absTop - (window.innerHeight - rect.height) / 2;
+  return Math.max(0, top);
+}
+
+/** Мгновенно (без smooth-scroll) возвращает к карточке. */
+export function scrollToAnchor(anchor: ReturnAnchor): boolean {
+  const top = computeAnchorTop(anchor);
+  if (top === null) return false;
+  window.scrollTo({ top, left: 0, behavior: "instant" as ScrollBehavior });
   return true;
 }

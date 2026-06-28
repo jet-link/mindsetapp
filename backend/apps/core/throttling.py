@@ -27,18 +27,25 @@ def cooldown_retry_after(
     min_interval: int = 0,
     hourly_cap: int | None = None,
     record: bool = True,
+    target: str | None = None,
 ) -> int:
     """Сколько секунд осталось ждать (0 — действие разрешено).
 
     При ``record=True`` и разрешённом действии фиксирует факт действия в кэше.
     Анонимов не лимитируем — их и так отсекают permission-классы.
+
+    ``target`` (например, ``theme:5`` / ``reply:12``) делает короткий
+    ``min_interval`` точечным: ответ одной теме/ответу не блокирует другие.
+    Часовой потолок (``hourly_cap``) при этом остаётся общим на пользователя —
+    это и есть реальная анти-спам защита.
     """
     if not user or not user.is_authenticated:
         return 0
 
     now = time.time()
     ident = user.pk
-    last_key = f'cooldown:{scope}:last:{ident}'
+    last_ident = f'{ident}:{target}' if target else f'{ident}'
+    last_key = f'cooldown:{scope}:last:{last_ident}'
     hist_key = f'cooldown:{scope}:hist:{ident}'
 
     # 1) Минимальный интервал между действиями.

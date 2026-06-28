@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
 import LoginCta from "@/components/LoginCta";
+import VirtualizedFeedList from "@/components/VirtualizedFeedList";
 import {
   AUTH_EVENT,
   FOLLOW_EVENT,
@@ -20,6 +21,7 @@ import {
   ThemeRepostDetail,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
+  CursorPage,
   FeedTab,
   Theme,
   getFeed,
@@ -32,9 +34,16 @@ import {
   getLastFeedTab,
   setLastFeedTab,
   removeAuthorFromFollowingFeedCache,
+  wasHydratedFromDisk,
+  markFeedRevalidated,
 } from "@/lib/feed-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
-import { findReturnAnchorByPrefix, parseListKeySearchParams, setListKey } from "@/lib/return-anchor";
+import {
+  findReturnAnchorByPrefix,
+  parseListKeySearchParams,
+  peekReturnAnchorForList,
+  setListKey,
+} from "@/lib/return-anchor";
 import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
@@ -63,6 +72,10 @@ function emptySlices(): Record<WallTab, TabSlice> {
 
 function normalizeTab(tab: string): WallTab {
   return tab === "following" ? "following" : "for-you";
+}
+
+function cursorFromNext(next: string | null): string | null {
+  return next ? new URL(next, "http://x").searchParams.get("cursor") : null;
 }
 
 function initSlicesFromCache(): Record<WallTab, TabSlice> {
@@ -121,6 +134,19 @@ export default function Feed() {
   const scrollLocked = useRef(false);
   const programmaticScroll = useRef(false);
 
+  // Предзагруженная вперёд страница на вкладку: ключуем по курсору, чтобы при
+  // достижении конца ленты добавить её мгновенно, без ожидания сети.
+  type Prefetch = { cursor: string; promise: Promise<CursorPage<Theme>> };
+  const prefetchRef = useRef<Partial<Record<WallTab, Prefetch | undefined>>>({});
+  // Последняя упавшая загрузка — чтобы повторить вручную (кнопка) или авто при
+  // восстановлении соединения.
+  const failedRef = useRef<{ tab: WallTab; cursor?: string } | null>(null);
+  // Вкладки, которые уже ревалидировали после показа из дискового кэша.
+  const revalidatedRef = useRef<Set<WallTab>>(new Set());
+  // Защита от повторной догрузки той же порции (мгновенный путь не поднимает
+  // loadingTab, поэтому observer не отключается — нужен отдельный флаг).
+  const loadMoreInFlight = useRef<Partial<Record<WallTab, boolean>>>({});
+
   slicesRef.current = slices;
   tabRef.current = tab;
 
@@ -159,17 +185,26 @@ export default function Feed() {
     if (panelsRef.current) panelsRef.current.style.minHeight = "";
   }, []);
 
-  const load = useCallback(async (activeTab: WallTab, cursor?: string, force = false) => {
-    if (!cursor && !force && slicesRef.current[activeTab].loaded) return;
+  // Тихо запрашиваем следующую страницу заранее (за 2-3 экрана до конца) и
+  // держим её в памяти. Не дублируем уже идущий префетч того же курсора.
+  const prefetchNext = useCallback((activeTab: WallTab, cursor: string | null) => {
+    if (!cursor) return;
+    const existing = prefetchRef.current[activeTab];
+    if (existing && existing.cursor === cursor) return;
+    const entry: Prefetch = { cursor, promise: getFeed(activeTab as FeedTab, cursor) };
+    prefetchRef.current[activeTab] = entry;
+    entry.promise.catch(() => {
+      // Ошибку префетча проглатываем: обычная загрузка повторит запрос и покажет
+      // пользователю состояние ошибки. Сбрасываем слот, чтобы можно было повторить.
+      if (prefetchRef.current[activeTab] === entry) {
+        prefetchRef.current[activeTab] = undefined;
+      }
+    });
+  }, []);
 
-    setLoadingTab(activeTab);
-    setError("");
-    try {
-      const page = await getFeed(activeTab as FeedTab, cursor);
-      if (tabRef.current !== activeTab && !cursor) return;
-      const next = page.next
-        ? new URL(page.next, "http://x").searchParams.get("cursor")
-        : null;
+  const applyPage = useCallback(
+    (activeTab: WallTab, cursor: string | undefined, page: CursorPage<Theme>) => {
+      const next = cursorFromNext(page.next);
       setSlices((prev) => {
         const slice = prev[activeTab];
         return {
@@ -181,14 +216,96 @@ export default function Feed() {
           },
         };
       });
-    } catch (e) {
-      if (tabRef.current === activeTab) {
-        setError(e instanceof Error ? e.message : "Failed to load the feed");
+      // Сразу готовим следующую порцию, чтобы дойдя до конца, добавить мгновенно.
+      prefetchNext(activeTab, next);
+    },
+    [prefetchNext],
+  );
+
+  const load = useCallback(
+    async (activeTab: WallTab, cursor?: string, force = false) => {
+      if (!cursor && !force && slicesRef.current[activeTab].loaded) return;
+
+      setLoadingTab(activeTab);
+      setError("");
+      try {
+        const page = await getFeed(activeTab as FeedTab, cursor);
+        if (tabRef.current !== activeTab && !cursor) return;
+        failedRef.current = null;
+        applyPage(activeTab, cursor, page);
+      } catch (e) {
+        if (tabRef.current === activeTab) {
+          failedRef.current = { tab: activeTab, cursor };
+          setError(e instanceof Error ? e.message : "Failed to load the feed");
+        }
+      } finally {
+        setLoadingTab((current) => (current === activeTab ? null : current));
       }
-    } finally {
-      setLoadingTab((current) => (current === activeTab ? null : current));
+    },
+    [applyPage],
+  );
+
+  // Stale-while-revalidate: показав посты из дискового кэша, в фоне подтягиваем
+  // первую страницу и доклеиваем сверху только новые посты (курсор не трогаем).
+  // Если свежая страница совсем не пересекается с кэшем (кэш сильно устарел) —
+  // заменяем целиком, чтобы не было разрыва в хронологии.
+  const revalidate = useCallback(async (activeTab: WallTab) => {
+    try {
+      const page = await getFeed(activeTab as FeedTab);
+      markFeedRevalidated(activeTab);
+      const freshNext = cursorFromNext(page.next);
+      setSlices((prev) => {
+        const slice = prev[activeTab];
+        const existingIds = new Set(slice.themes.map((t) => t.id));
+        const overlap = page.results.some((t) => existingIds.has(t.id));
+        if (overlap) {
+          const newOnes = page.results.filter((t) => !existingIds.has(t.id));
+          if (newOnes.length === 0) return prev;
+          return {
+            ...prev,
+            [activeTab]: { ...slice, themes: [...newOnes, ...slice.themes] },
+          };
+        }
+        return {
+          ...prev,
+          [activeTab]: {
+            themes: page.results,
+            nextCursor: freshNext,
+            loaded: true,
+          },
+        };
+      });
+      prefetchNext(activeTab, freshNext);
+    } catch {
+      // Сеть недоступна — оставляем кэшированные посты как есть.
     }
-  }, []);
+  }, [prefetchNext]);
+
+  // Догрузка следующей порции при достижении конца ленты. Если страница уже
+  // предзагружена (prefetch) — добавляем её мгновенно, без спиннера и без сети.
+  const loadMore = useCallback(
+    async (activeTab: WallTab, cursor: string) => {
+      if (loadMoreInFlight.current[activeTab]) return;
+      const entry = prefetchRef.current[activeTab];
+      if (entry && entry.cursor === cursor) {
+        prefetchRef.current[activeTab] = undefined;
+        loadMoreInFlight.current[activeTab] = true;
+        try {
+          const page = await entry.promise;
+          failedRef.current = null;
+          applyPage(activeTab, cursor, page);
+        } catch {
+          // Префетч не удался — повторяем как обычную загрузку с индикатором.
+          load(activeTab, cursor);
+        } finally {
+          loadMoreInFlight.current[activeTab] = false;
+        }
+        return;
+      }
+      load(activeTab, cursor);
+    },
+    [applyPage, load],
+  );
 
   const switchTab = useCallback(
     (nextTab: WallTab) => {
@@ -232,6 +349,26 @@ export default function Feed() {
   useEffect(() => {
     load(tab);
   }, [tab, load]);
+
+  // Если активная вкладка показана из дискового кэша — один раз ревалидируем её
+  // в фоне (свежие посты сверху), не трогая мгновенно показанный кэш.
+  useEffect(() => {
+    if (revalidatedRef.current.has(tab)) return;
+    if (!wasHydratedFromDisk(tab)) return;
+    revalidatedRef.current.add(tab);
+    revalidate(tab);
+  }, [tab, revalidate]);
+
+  // При восстановлении соединения автоматически повторяем упавшую загрузку.
+  useEffect(() => {
+    const onOnline = () => {
+      const failed = failedRef.current;
+      if (!failed) return;
+      load(failed.tab, failed.cursor, !failed.cursor);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [load]);
 
   useLayoutEffect(() => {
     restoreLockedScroll();
@@ -434,6 +571,12 @@ export default function Feed() {
   const activeLoading = loadingTab === tab;
   const listKey = `/?tab=${tab}`;
 
+  // Если ждём возврат к карточке (после back), держим её в DOM даже вне окна
+  // виртуализации, чтобы useRestoreAnchor нашёл элемент и спозиционировался.
+  const pendingAnchor = peekReturnAnchorForList(listKey);
+  const anchorThemeId =
+    pendingAnchor && pendingAnchor.kind === "theme" ? pendingAnchor.id : null;
+
   useEffect(() => {
     setListKey(listKey);
   }, [listKey]);
@@ -445,7 +588,7 @@ export default function Feed() {
     loading: activeLoading,
     onLoadMore: () => {
       const cursor = slicesRef.current[tab].nextCursor;
-      if (cursor) load(tab, cursor);
+      if (cursor) loadMore(tab, cursor);
     },
   });
 
@@ -489,15 +632,36 @@ export default function Feed() {
               hidden={!isActive}
               className="profile-tab-panel"
             >
-              {isActive && error && <p className="muted">{error}</p>}
+              {isActive && error && (
+                <p className="muted feed-error">
+                  <span>{error}</span>{" "}
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      const failed = failedRef.current;
+                      if (failed && failed.tab === tabId) {
+                        load(tabId, failed.cursor, !failed.cursor);
+                      } else {
+                        load(tabId, slice.nextCursor ?? undefined, !slice.nextCursor);
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+                </p>
+              )}
               {isActive && !isLoading && !error && slice.themes.length === 0 && (
                 <p className="muted">{EMPTY_TEXT[tabId]}</p>
               )}
 
-              <div className="feed-list">
-                {slice.themes.map((t) => (
+              <VirtualizedFeedList
+                items={slice.themes}
+                className="feed-list"
+                getKey={(t) => t.id}
+                forceKey={isActive ? anchorThemeId : null}
+                renderItem={(t) => (
                   <ThemeCard
-                    key={`${tabId}-${t.id}`}
                     theme={t}
                     onDeleted={() =>
                       setSlices((prev) => ({
@@ -509,8 +673,8 @@ export default function Feed() {
                       }))
                     }
                   />
-                ))}
-              </div>
+                )}
+              />
 
               {isActive && isLoading && slice.themes.length === 0 && (
                 <p className="muted">Loading…</p>
@@ -527,7 +691,7 @@ export default function Feed() {
                       <button
                         type="button"
                         className="link-btn"
-                        onClick={() => load(tabId, slice.nextCursor!)}
+                        onClick={() => loadMore(tabId, slice.nextCursor!)}
                       >
                         Show more
                       </button>

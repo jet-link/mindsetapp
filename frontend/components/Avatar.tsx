@@ -33,7 +33,15 @@ export default function Avatar({
   const cls = large ? "avatar avatar--lg" : "avatar";
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img className={cls} src={src} alt={username} />;
+    return (
+      <img
+        className={cls}
+        src={src}
+        alt={username}
+        loading="lazy"
+        decoding="async"
+      />
+    );
   }
   return <span className={cls}>{username[0]?.toUpperCase()}</span>;
 }

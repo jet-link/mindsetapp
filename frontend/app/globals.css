@@ -1826,6 +1826,14 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 /* Невидимый «сторож» для бесконечного скролла */
 .feed-sentinel { width: 100%; height: 1px; }
 
+/* Ошибка загрузки ленты + кнопка повтора */
+.feed-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Тулбар страницы: стрелка слева, заголовок по центру */
 .page-toolbar {
   position: relative;

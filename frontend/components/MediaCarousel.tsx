@@ -49,6 +49,10 @@ function MediaThumb({
         srcSet={srcSet}
         sizes={wide ? "100vw" : "(max-width: 620px) 70vw, 360px"}
         alt=""
+        loading="lazy"
+        decoding="async"
+        width={m.width ?? undefined}
+        height={m.height ?? undefined}
       />
     </button>
   );

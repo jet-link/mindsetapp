@@ -11,9 +11,14 @@ class CreatedAtCursorPagination(CursorPagination):
 
 
 class FeedCursorPagination(CreatedAtCursorPagination):
-    """Лента threads-стиля: первая порция в 50 постов под бесконечный скролл."""
+    """Лента threads-стиля: порции по 20 постов под бесконечный скролл.
 
-    page_size = 50
+    Размер порции можно переопределить через ?limit= (с потолком max_page_size),
+    чтобы клиент мог запрашивать ровно столько, сколько ему нужно."""
+
+    page_size = 20
+    page_size_query_param = 'limit'
+    max_page_size = 50
 
 
 class IdCursorPagination(CursorPagination):

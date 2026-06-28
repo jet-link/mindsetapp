@@ -6,6 +6,8 @@ import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
 import LoginCta from "@/components/LoginCta";
 import VirtualizedFeedList from "@/components/VirtualizedFeedList";
+import AnimatedTabBar from "@/components/AnimatedTabBar";
+import ListEnterItem from "@/components/ListEnterItem";
 import {
   AUTH_EVENT,
   FOLLOW_EVENT,
@@ -39,6 +41,7 @@ import {
   markFeedRevalidated,
 } from "@/lib/feed-cache";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
+import { useTabSwitchAnimation } from "@/lib/use-tab-switch-animation";
 import {
   findReturnAnchorByPrefix,
   parseListKeySearchParams,
@@ -600,6 +603,10 @@ export default function Feed() {
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
   const listKey = `/?tab=${tab}`;
+  const { panelEnterClass, itemEnter } = useTabSwitchAnimation(
+    tab,
+    activeSlice.loaded && !activeLoading,
+  );
 
   // Если ждём возврат к карточке (после back), держим её в DOM даже вне окна
   // виртуализации, чтобы useRestoreAnchor нашёл элемент и спозиционировался.
@@ -627,23 +634,16 @@ export default function Feed() {
       <PageHeader title="Main wall" showBack={false} />
 
       {authed === true && (
-        <div className="tabs feed-tabs" role="tablist" aria-label="Feed">
-          {ALL_TABS.map((tabId) => (
-            <button
-              key={tabId}
-              type="button"
-              role="tab"
-              aria-selected={tab === tabId}
-              className={tab === tabId ? "active" : ""}
-              onClick={(e) => {
-                switchTab(tabId);
-                e.currentTarget.blur();
-              }}
-            >
-              {tabId === "for-you" ? "For you" : "Following"}
-            </button>
-          ))}
-        </div>
+        <AnimatedTabBar
+          className="feed-tabs"
+          ariaLabel="Feed"
+          activeId={tab}
+          onSelect={switchTab}
+          tabs={ALL_TABS.map((tabId) => ({
+            id: tabId,
+            label: tabId === "for-you" ? "For you" : "Following",
+          }))}
+        />
       )}
 
       <div className="profile-tab-panels feed-tab-panels" ref={panelsRef}>
@@ -660,7 +660,7 @@ export default function Feed() {
               key={tabId}
               role="tabpanel"
               hidden={!isActive}
-              className="profile-tab-panel"
+              className={`profile-tab-panel${isActive ? ` ${panelEnterClass}` : ""}`}
             >
               {isActive && error && (
                 <p className="muted feed-error">
@@ -690,19 +690,21 @@ export default function Feed() {
                 className="feed-list"
                 getKey={(t) => t.id}
                 forceKey={isActive ? anchorThemeId : null}
-                renderItem={(t) => (
-                  <ThemeCard
-                    theme={t}
-                    onDeleted={() =>
-                      setSlices((prev) => ({
-                        ...prev,
-                        [tabId]: {
-                          ...prev[tabId],
-                          themes: prev[tabId].themes.filter((x) => x.id !== t.id),
-                        },
-                      }))
-                    }
-                  />
+                renderItem={(t, index) => (
+                  <ListEnterItem index={index} animate={isActive && itemEnter}>
+                    <ThemeCard
+                      theme={t}
+                      onDeleted={() =>
+                        setSlices((prev) => ({
+                          ...prev,
+                          [tabId]: {
+                            ...prev[tabId],
+                            themes: prev[tabId].themes.filter((x) => x.id !== t.id),
+                          },
+                        }))
+                      }
+                    />
+                  </ListEnterItem>
                 )}
               />
 

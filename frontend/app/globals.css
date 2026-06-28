@@ -809,6 +809,35 @@ a { color: inherit; text-decoration: none; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--text); }
 .tabs button:disabled { cursor: default; opacity: 0.45; }
 
+/* Скользящий индикатор активной вкладки */
+.tabs--animated {
+  position: relative;
+}
+.tabs--animated button {
+  transition: color 0.24s ease;
+}
+.tabs--animated button.active {
+  border-bottom-color: transparent;
+}
+.tabs__indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--text);
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.18s ease;
+  will-change: transform, width;
+}
+.tabs__indicator--ready {
+  opacity: 1;
+}
+
 /* Вкладки ленты (For you / Following) */
 .feed-tabs { margin-top: 4px; }
 
@@ -1532,6 +1561,68 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 }
 .profile-tab-panel[hidden] {
   display: none;
+}
+
+/* Появление панели вкладки при переключении */
+.profile-tab-panel.tab-panel--enter {
+  animation: tab-panel-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Каскадное появление карточек внутри вкладки */
+.list-enter {
+  animation: list-enter-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Сетка медиа на профиле — каскад по ячейкам */
+.media-grid--enter .media-grid__item {
+  animation: list-enter-up 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.media-grid--enter .media-grid__item:nth-child(1) { animation-delay: 0ms; }
+.media-grid--enter .media-grid__item:nth-child(2) { animation-delay: 42ms; }
+.media-grid--enter .media-grid__item:nth-child(3) { animation-delay: 84ms; }
+.media-grid--enter .media-grid__item:nth-child(4) { animation-delay: 126ms; }
+.media-grid--enter .media-grid__item:nth-child(5) { animation-delay: 168ms; }
+.media-grid--enter .media-grid__item:nth-child(6) { animation-delay: 210ms; }
+.media-grid--enter .media-grid__item:nth-child(7) { animation-delay: 252ms; }
+.media-grid--enter .media-grid__item:nth-child(8) { animation-delay: 294ms; }
+.media-grid--enter .media-grid__item:nth-child(9) { animation-delay: 336ms; }
+.media-grid--enter .media-grid__item:nth-child(n+10) { animation-delay: 380ms; }
+
+@keyframes tab-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes list-enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs__indicator {
+    transition: none;
+  }
+  .profile-tab-panel.tab-panel--enter,
+  .list-enter,
+  .media-grid--enter .media-grid__item {
+    animation: tab-panel-in-reduced 0.12s ease both;
+  }
+  @keyframes tab-panel-in-reduced {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 /* Формы (login/register) */

@@ -36,7 +36,7 @@ export default function VirtualizedFeedList<T>({
 }: {
   items: T[];
   getKey: (item: T) => Key;
-  renderItem: (item: T) => React.ReactNode;
+  renderItem: (item: T, index: number) => React.ReactNode;
   className?: string;
   /** Оценка высоты ещё не измеренной карточки (px). */
   estimateHeight?: number;
@@ -156,8 +156,8 @@ export default function VirtualizedFeedList<T>({
   if (!active) {
     return (
       <div ref={containerRef} className={className}>
-        {items.map((item) => (
-          <div key={getKey(item)}>{renderItem(item)}</div>
+        {items.map((item, index) => (
+          <div key={getKey(item)}>{renderItem(item, index)}</div>
         ))}
       </div>
     );
@@ -176,8 +176,9 @@ export default function VirtualizedFeedList<T>({
   return (
     <div ref={containerRef} className={className}>
       <div style={{ height: topPad }} aria-hidden="true" />
-      {windowItems.map((item) => {
+      {windowItems.map((item, i) => {
         const key = getKey(item);
+        const index = start + i;
         return (
           <div
             key={key}
@@ -186,7 +187,7 @@ export default function VirtualizedFeedList<T>({
               else rowElsRef.current.delete(key);
             }}
           >
-            {renderItem(item)}
+            {renderItem(item, index)}
           </div>
         );
       })}

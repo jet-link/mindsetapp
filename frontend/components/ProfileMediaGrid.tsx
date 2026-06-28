@@ -9,9 +9,12 @@ import { saveReturnAnchor } from "@/lib/return-anchor";
 export default function ProfileMediaGrid({
   username,
   items,
+  enter = false,
 }: {
   username: string;
   items: MediaItem[];
+  /** Каскадное появление ячеек при смене вкладки. */
+  enter?: boolean;
 }) {
   const router = useRouter();
 
@@ -37,7 +40,7 @@ export default function ProfileMediaGrid({
   }
 
   return (
-    <div className="media-grid">
+    <div className={`media-grid${enter ? " media-grid--enter" : ""}`}>
       {items.map((m) => {
         const animated = isGifMedia(m);
         return (

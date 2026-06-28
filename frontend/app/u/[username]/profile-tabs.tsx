@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname } from "next/navigation";
 import ReplyCard from "@/components/ReplyCard";
 import ListExitWrap from "@/components/ListExitWrap";
+import ListEnterItem from "@/components/ListEnterItem";
+import AnimatedTabBar from "@/components/AnimatedTabBar";
 import ProfileMediaGrid from "@/components/ProfileMediaGrid";
 import ThemeCard from "@/components/ThemeCard";
 import {
@@ -48,6 +50,7 @@ import {
 } from "@/lib/profile-tabs-cache";
 import { findReplyInAllCaches, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
+import { useTabSwitchAnimation } from "@/lib/use-tab-switch-animation";
 import {
   findReturnAnchorByPrefix,
   parseListKeySearchParams,
@@ -1147,6 +1150,10 @@ export default function ProfileTabs({
   const activeSlice = slices[tab];
   const activeLoading = loadingTab === tab;
   const listKey = `/u/${username}?tab=${tab}`;
+  const { panelEnterClass, itemEnter } = useTabSwitchAnimation(
+    tab,
+    activeSlice.loaded && !activeLoading,
+  );
 
   useEffect(() => {
     setListKey(listKey);
@@ -1187,23 +1194,13 @@ export default function ProfileTabs({
 
   return (
     <>
-      <div className="tabs profile-tabs" role="tablist" aria-label="Profile posts">
-        {TAB_DEFS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className={tab === t.id ? "active" : ""}
-            onClick={(e) => {
-              switchTab(t.id);
-              e.currentTarget.blur();
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <AnimatedTabBar
+        className="profile-tabs"
+        ariaLabel="Profile posts"
+        activeId={tab}
+        onSelect={switchTab}
+        tabs={TAB_DEFS.map((t) => ({ id: t.id, label: t.label }))}
+      />
 
       <div className="profile-tab-panels" ref={panelsRef}>
         {ALL_TABS.map((tabId) => {
@@ -1227,7 +1224,7 @@ export default function ProfileTabs({
               key={tabId}
               role="tabpanel"
               hidden={!isActive}
-              className="profile-tab-panel"
+              className={`profile-tab-panel${isActive ? ` ${panelEnterClass}` : ""}`}
             >
               {isActive && error && <p className="muted">{error}</p>}
               {isActive && !isLoading && !error && items.length === 0 && (
@@ -1236,101 +1233,127 @@ export default function ProfileTabs({
 
               <div className="feed-list">
                 {tabId === "replies"
-                  ? slice.replies.map((r) => (
-                      <ListExitWrap
+                  ? slice.replies.map((r, index) => (
+                      <ListEnterItem
                         key={`r-${r.id}`}
-                        exiting={exitingReplyIds.has(r.id)}
-                        onExitComplete={() => finishReplyRemove(r.id)}
+                        index={index}
+                        animate={isActive && itemEnter}
                       >
-                        <div className="profile-reply-thread">
-                          <div className="thread-chain">
-                            {r.parent ? (
+                        <ListExitWrap
+                          exiting={exitingReplyIds.has(r.id)}
+                          onExitComplete={() => finishReplyRemove(r.id)}
+                        >
+                          <div className="profile-reply-thread">
+                            <div className="thread-chain">
+                              {r.parent ? (
+                                <ReplyCard
+                                  reply={r.parent}
+                                  threadLineBelow
+                                  clickable
+                                />
+                              ) : (
+                                <ThemeCard
+                                  theme={r.theme}
+                                  threadLineBelow
+                                  {...themeRepostProps}
+                                  onDeleted={() => removeThemeFromSlices(r.theme.id)}
+                                />
+                              )}
                               <ReplyCard
-                                reply={r.parent}
-                                threadLineBelow
+                                reply={r}
+                                indented
                                 clickable
+                                listExitViaParent={isOwnProfile}
+                                onDeleteExitStart={(detail) => {
+                                  pendingReplyDeletes.current.set(r.id, detail);
+                                  scheduleReplyRemove(r.id);
+                                }}
+                                onDeleteExitFailed={() => cancelReplyRemove(r.id)}
                               />
-                            ) : (
-                              <ThemeCard
-                                theme={r.theme}
-                                threadLineBelow
-                                {...themeRepostProps}
-                                onDeleted={() => removeThemeFromSlices(r.theme.id)}
-                              />
-                            )}
-                            <ReplyCard
-                              reply={r}
-                              indented
-                              clickable
-                              listExitViaParent={isOwnProfile}
-                              onDeleteExitStart={(detail) => {
-                                pendingReplyDeletes.current.set(r.id, detail);
-                                scheduleReplyRemove(r.id);
-                              }}
-                              onDeleteExitFailed={() => cancelReplyRemove(r.id)}
-                            />
+                            </div>
                           </div>
-                        </div>
-                      </ListExitWrap>
+                        </ListExitWrap>
+                      </ListEnterItem>
                     ))
                   : tabId === "reposts"
-                    ? slice.reposts.map((item) => {
+                    ? slice.reposts.map((item, index) => {
                         const key = profileRepostKey(item);
                         if (item.kind === "reply" && item.reply) {
                           const reply = item.reply;
                           return (
-                            <ListExitWrap
+                            <ListEnterItem
                               key={key}
-                              exiting={exitingRepostIds.has(key)}
-                              onExitComplete={() => removeRepostFromSlice(key)}
+                              index={index}
+                              animate={isActive && itemEnter}
                             >
-                              <ReplyCard
-                                reply={reply}
-                                clickable
-                                showReplyBadge
-                                {...replyRepostProps}
-                              />
-                            </ListExitWrap>
+                              <ListExitWrap
+                                exiting={exitingRepostIds.has(key)}
+                                onExitComplete={() => removeRepostFromSlice(key)}
+                              >
+                                <ReplyCard
+                                  reply={reply}
+                                  clickable
+                                  showReplyBadge
+                                  {...replyRepostProps}
+                                />
+                              </ListExitWrap>
+                            </ListEnterItem>
                           );
                         }
                         if (item.kind === "theme" && item.theme) {
                           const theme = item.theme;
                           return (
-                            <ListExitWrap
+                            <ListEnterItem
                               key={key}
-                              exiting={exitingRepostIds.has(key)}
-                              onExitComplete={() => removeRepostFromSlice(key)}
+                              index={index}
+                              animate={isActive && itemEnter}
                             >
-                              <ThemeCard
-                                theme={theme}
-                                {...themeRepostProps}
-                                onDeleted={() => removeThemeFromSlices(theme.id)}
-                              />
-                            </ListExitWrap>
+                              <ListExitWrap
+                                exiting={exitingRepostIds.has(key)}
+                                onExitComplete={() => removeRepostFromSlice(key)}
+                              >
+                                <ThemeCard
+                                  theme={theme}
+                                  {...themeRepostProps}
+                                  onDeleted={() => removeThemeFromSlices(theme.id)}
+                                />
+                              </ListExitWrap>
+                            </ListEnterItem>
                           );
                         }
                         return null;
                       })
                     : tabId === "themes"
-                      ? slice.themes.map((t) => (
-                          <ListExitWrap
+                      ? slice.themes.map((t, index) => (
+                          <ListEnterItem
                             key={`${tabId}-${t.id}`}
-                            exiting={exitingThemeIds.has(t.id)}
-                            onExitComplete={() => finishThemeRemove(t.id)}
+                            index={index}
+                            animate={isActive && itemEnter}
                           >
-                            <ThemeCard
-                              theme={t}
-                              listExitViaParent={isOwnProfile}
-                              onDeleteExitStart={() => {
-                                pendingThemeDeletes.current.add(t.id);
-                                scheduleThemeRemove(t.id);
-                              }}
-                              onDeleteExitFailed={() => cancelThemeRemove(t.id)}
-                              {...themeRepostProps}
-                            />
-                          </ListExitWrap>
+                            <ListExitWrap
+                              exiting={exitingThemeIds.has(t.id)}
+                              onExitComplete={() => finishThemeRemove(t.id)}
+                            >
+                              <ThemeCard
+                                theme={t}
+                                listExitViaParent={isOwnProfile}
+                                onDeleteExitStart={() => {
+                                  pendingThemeDeletes.current.add(t.id);
+                                  scheduleThemeRemove(t.id);
+                                }}
+                                onDeleteExitFailed={() => cancelThemeRemove(t.id)}
+                                {...themeRepostProps}
+                              />
+                            </ListExitWrap>
+                          </ListEnterItem>
                         ))
-                      : <ProfileMediaGrid username={username} items={slice.media} />}
+                      : (
+                        <ProfileMediaGrid
+                          username={username}
+                          items={slice.media}
+                          enter={isActive && itemEnter}
+                        />
+                      )}
               </div>
 
               {isActive && isLoading && items.length === 0 && (

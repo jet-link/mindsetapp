@@ -45,6 +45,20 @@ import {
 } from "./tag-cache";
 import { findReplyInAllCaches, findThemeInAllCaches } from "./theme-cache-lookup";
 import { setUserAvatarOverride } from "./user-avatar-store";
+import i18n, { initI18n } from "./i18n/config";
+import { getStoredLocale } from "./i18n/storage";
+import { type Locale } from "./i18n/languages";
+
+/** Локализованная строка для клиентских сообщений (с гарантией инициализации). */
+function tr(key: string, opts?: Record<string, unknown>): string {
+  if (!i18n.isInitialized) initI18n();
+  return i18n.t(key, opts) as string;
+}
+
+/** Язык для заголовка Accept-Language: выбор пользователя (или en по умолчанию). */
+function currentLocale(): Locale {
+  return getStoredLocale();
+}
 
 export interface UserPublic {
   id: number;
@@ -216,6 +230,8 @@ function authHeaders(): Record<string, string> {
 
 function humanizeApiError(status: number, rawBody: string): string {
   // DRF отдает JSON с деталями; HTML-страницы ошибок Django не показываем.
+  // Текст `detail`/валидации сервер уже локализует по Accept-Language, поэтому
+  // его отдаём как есть; общие коды статусов переводим на клиенте.
   try {
     const data = JSON.parse(rawBody);
     if (typeof data.detail === "string") return data.detail;
@@ -229,9 +245,9 @@ function humanizeApiError(status: number, rawBody: string): string {
   } catch {
     // не JSON — отдаем общее сообщение ниже
   }
-  if (status === 401) return "You need to log in.";
-  if (status === 403) return "You don't have permission to do that.";
-  return `Server error (${status}). Please try again.`;
+  if (status === 401) return tr("errors:needLogin");
+  if (status === 403) return tr("errors:noPermission");
+  return tr("errors:serverError", { status });
 }
 
 // Один общий refresh на все параллельные запросы, чтобы не дергать
@@ -296,6 +312,7 @@ export async function apiFetch<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": currentLocale(),
       ...authHeaders(),
       ...init.headers,
     },
@@ -311,7 +328,11 @@ export async function apiFetch<T>(
       const anon = await fetch(`${apiBase()}${path}`, {
         ...init,
         method,
-        headers: { "Content-Type": "application/json", ...init.headers },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": currentLocale(),
+          ...init.headers,
+        },
         cache: "no-store",
         signal: init.signal,
       });
@@ -389,7 +410,11 @@ export async function login(username: string, password: string, remember = true)
 
   if (!res.ok || !data.ok || !data.access || !data.refresh) {
     const code = data.code ?? "user_not_found";
-    const message = data.message ?? (code === "password_incorrect" ? "Password incorrectly" : "User not found");
+    const message =
+      data.message ??
+      (code === "password_incorrect"
+        ? tr("auth:passwordIncorrect")
+        : tr("auth:userNotFound"));
     throw new LoginError(code, message);
   }
 
@@ -463,14 +488,24 @@ interface CooldownPayload {
   detail?: string;
 }
 
+/** Кулдаун публикации: несёт число секунд для локального отсчёта на клиенте. */
+export class CooldownError extends Error {
+  retryAfter: number;
+
+  constructor(retryAfter: number, message: string) {
+    super(message);
+    this.name = "CooldownError";
+    this.retryAfter = retryAfter;
+  }
+}
+
 // Сервер отдаёт кулдаун как 200 {cooldown:true,...} (чтобы браузер не сыпал 429
 // в консоль). Превращаем это в ошибку — её ловят формы и показывают отсчёт.
+// `detail` уже локализован сервером (Accept-Language), `retry_after` — секунды.
 function throwIfCooldown(data: unknown) {
   const d = data as CooldownPayload | null;
   if (d && d.cooldown) {
-    throw new Error(
-      d.detail ?? `You're posting too fast. Try again in ${d.retry_after ?? 0} seconds.`,
-    );
+    throw new CooldownError(d.retry_after ?? 0, d.detail ?? "");
   }
 }
 
@@ -582,16 +617,6 @@ export const getUserMedia = (username: string, cursor?: string) =>
   apiFetch<CursorPage<MediaItem>>(
     `/api/v1/users/${encodeURIComponent(username)}/media/${buildQuery({ cursor })}`,
   );
-
-/**
- * Счетчики под темами: до 9999 — как есть, дальше 10k, 11k … 999k, 1m …
- */
-export function formatCount(n: number): string {
-  if (n < 10_000) return String(n);
-  if (n < 1_000_000) return `${Math.floor(n / 1_000)}k`;
-  if (n < 1_000_000_000) return `${Math.floor(n / 1_000_000)}m`;
-  return `${Math.floor(n / 1_000_000_000)}b`;
-}
 
 export const toggleFollow = (username: string) =>
   apiFetch<{ following: boolean; followers_count: number; following_count: number }>(
@@ -725,6 +750,7 @@ export interface MeProfile {
   email: string;
   avatar: string | null;
   bio: string;
+  language: Locale;
   followers_count: number;
   following_count: number;
   themes_count: number;
@@ -734,6 +760,13 @@ export const getMe = () => apiFetch<MeProfile>("/api/v1/me/");
 
 export const updateMeBio = (bio: string) =>
   apiFetch<MeProfile>("/api/v1/me/", { method: "PATCH", body: JSON.stringify({ bio }) });
+
+/** Сохраняет язык интерфейса в профиле пользователя (PATCH /api/v1/me/language/). */
+export const updateMeLanguage = (language: Locale) =>
+  apiFetch<{ success: boolean; language: Locale }>("/api/v1/me/language/", {
+    method: "PATCH",
+    body: JSON.stringify({ language }),
+  });
 
 async function apiFetchMultipart<T>(
   path: string,
@@ -748,7 +781,7 @@ async function apiFetchMultipart<T>(
   const res = await fetch(`${multipartUploadBase()}${path}`, {
     method,
     // Content-Type не задаём вручную — браузер сам выставит boundary.
-    headers: { ...authHeaders() },
+    headers: { "Accept-Language": currentLocale(), ...authHeaders() },
     body: formData,
     cache: "no-store",
   });

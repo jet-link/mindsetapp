@@ -26,10 +26,21 @@ class UserManager(DjangoUserManager):
         return super().create_superuser(username, email, password, **extra_fields)
 
 
+class Language(models.TextChoices):
+    EN = 'en', 'English'
+    RU = 'ru', 'Russian'
+    UZ = 'uz', 'Uzbek'
+
+
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     avatar = models.ImageField(upload_to='avatars/%Y/%m/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
+    language = models.CharField(
+        max_length=5,
+        choices=Language.choices,
+        default=Language.EN,
+    )
 
     followers_count = models.PositiveIntegerField(default=0)
     following_count = models.PositiveIntegerField(default=0)

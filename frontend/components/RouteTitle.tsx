@@ -2,10 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import i18n, { initI18n } from "@/lib/i18n/config";
 
 const SUFFIX = "Mindset";
 
-export const HOME_PAGE_TITLE = `Main wall | ${SUFFIX}`;
+function homeTitle(): string {
+  if (!i18n.isInitialized) initI18n();
+  return i18n.t("common:mainWall");
+}
 
 // Текущий желаемый title страницы. Next.js при повторной навигации на тот же
 // маршрут сбрасывает document.title на дефолт — поэтому держим его здесь и
@@ -39,7 +43,7 @@ export function setPageTitle(title: string) {
 
 /** Удобный шорткат для главной (лого / пункт «Main wall»). */
 export function scheduleHomePageTitle() {
-  setPageTitle("Main wall");
+  setPageTitle(homeTitle());
 }
 
 export default function RouteTitle() {

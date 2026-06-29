@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AUTH_EVENT,
   deleteReply,
@@ -37,6 +38,7 @@ export default function CardMenu({
   onDeleteSuccess?: (replyDetail?: ReplyDeletedDetail) => void;
   onDeleteFailed?: () => void;
 }) {
+  const { t } = useTranslation("moderation");
   const [open, setOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -44,8 +46,8 @@ export default function CardMenu({
   const [isOwn, setIsOwn] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const copyLabel = kind === "theme" ? "Copy theme link" : "Copy reply link";
-  const copiedLabel = kind === "theme" ? "Theme link was copied!" : "Reply link was copied!";
+  const copyLabel = kind === "theme" ? t("copyThemeLink") : t("copyReplyLink");
+  const copiedLabel = kind === "theme" ? t("themeLinkCopied") : t("replyLinkCopied");
   const canDelete =
     isOwn && (isDeletable ?? isWithinDeleteWindow(createdAt));
 
@@ -107,8 +109,8 @@ export default function CardMenu({
       <button
         type="button"
         className="card-menu__trigger"
-        aria-label="More actions"
-        title="More actions"
+        aria-label={t("common:moreActions")}
+        title={t("common:moreActions")}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="card-menu__dots" aria-hidden="true">
@@ -130,7 +132,7 @@ export default function CardMenu({
               role="menuitem"
               onClick={onDelete}
             >
-              Delete
+              {t("delete")}
             </button>
           )}
           {authed && !isOwn && (
@@ -143,7 +145,7 @@ export default function CardMenu({
                 setReportOpen(true);
               }}
             >
-              Report
+              {t("report")}
             </button>
           )}
         </div>

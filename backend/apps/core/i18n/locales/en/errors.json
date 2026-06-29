@@ -1,0 +1,20 @@
+{
+  "login.userNotFound": "User not found",
+  "login.passwordIncorrect": "Password incorrectly",
+  "register.userExists": "User already exist",
+  "register.usernameInvalid": "Username incorrectly",
+  "register.emailRegistered": "Email address is already registered!",
+  "register.emailInvalid": "Email incorrectly",
+  "register.passwordCommon": "Password is too common",
+  "register.passwordShort": "Password is too short",
+  "register.passwordNumeric": "Password is entirely numeric",
+  "register.passwordSimilar": "Password is too similar to personal info",
+  "register.passwordInvalid": "Password is invalid",
+  "content.addTextOrMedia": "Add some text or media.",
+  "content.themeNotEditable": "Theme is no longer editable.",
+  "content.themeNotDeletable": "Theme is no longer deletable.",
+  "content.replyNotDeletable": "Reply is no longer deletable.",
+  "content.serverError": "Server error. Please try again.",
+  "cooldown.posting": "You're posting too fast. Try again in {wait}s.",
+  "cooldown.replying": "You're replying too fast. Try again in {wait}s."
+}

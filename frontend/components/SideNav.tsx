@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AUTH_EVENT,
   NOTIFICATION_EVENT,
@@ -16,12 +17,12 @@ import { scheduleApplyCurrentTitle, scheduleHomePageTitle } from "@/components/R
 import { bounceNavItem } from "@/lib/nav-bounce";
 import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 
-function navItemIcon(it: NavItem, unread: number) {
+function navItemIcon(it: NavItem, unread: number, unreadLabel: string) {
   return (
     <span className="sidenav__icon-wrap">
       <i className={`fa ${it.icon}`} aria-hidden="true" />
       {it.badge && unread > 0 && (
-        <span className="nav-badge" aria-label={`${unread} unread notifications`}>
+        <span className="nav-badge" aria-label={unreadLabel}>
           {unread > 99 ? "99+" : unread}
         </span>
       )}
@@ -30,6 +31,7 @@ function navItemIcon(it: NavItem, unread: number) {
 }
 
 export default function SideNav() {
+  const { t } = useTranslation("common");
   const pathname = usePathname();
   const [username, setUsername] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
@@ -82,21 +84,23 @@ export default function SideNav() {
         </span>
       </Link>
 
-      <nav className="sidenav__menu" aria-label="Main navigation">
+      <nav className="sidenav__menu" aria-label={t("mainNavigation")}>
         {NAV_ITEMS.map((it) => {
           if (it.authOnly && !username) return null;
           const disabled = it.authGated && !username;
           const active = !disabled && pathname === it.href;
+          const label = t(it.labelKey);
+          const unreadLabel = t("unreadNotifications", { count: unread });
           if (disabled) {
             return (
               <span
                 key={it.href}
                 className="sidenav__item sidenav__item--disabled"
-                title={it.label}
-                aria-label={it.label}
+                title={label}
+                aria-label={label}
                 aria-disabled="true"
               >
-                {navItemIcon(it, unread)}
+                {navItemIcon(it, unread, unreadLabel)}
               </span>
             );
           }
@@ -107,8 +111,8 @@ export default function SideNav() {
               href={it.href}
               prefetch={it.href === "/compose" ? false : undefined}
               className={`sidenav__item${active ? " active" : ""}`}
-              title={it.label}
-              aria-label={it.label}
+              title={label}
+              aria-label={label}
               aria-current={active ? "page" : undefined}
               onPointerDown={(e) => bounceNavItem(e.currentTarget)}
               onClick={
@@ -119,7 +123,7 @@ export default function SideNav() {
                     : undefined
               }
             >
-              {navItemIcon(it, unread)}
+              {navItemIcon(it, unread, unreadLabel)}
             </Link>
           );
         })}

@@ -1,0 +1,21 @@
+{
+  "copyThemeLink": "Copy theme link",
+  "copyReplyLink": "Copy reply link",
+  "themeLinkCopied": "Theme link was copied!",
+  "replyLinkCopied": "Reply link was copied!",
+  "delete": "Delete",
+  "report": "Report",
+  "reportTheme": "Report a theme",
+  "reportReply": "Report a reply",
+  "reportReason": "Report reason",
+  "otherReason": "Other reason",
+  "otherPlaceholder": "Other…",
+  "reasonSpam": "Spam",
+  "reasonBullying": "Bullying or Harassment",
+  "reasonHate": "Hate Speech or Hate Symbols",
+  "reasonMisinformation": "Misinformation",
+  "reasonViolence": "Violence or Violent Content",
+  "reasonAdult": "Adult or Sexual Content",
+  "reasonScam": "Scam or Fraud",
+  "reasonCopyright": "Copyright Infringement"
+}

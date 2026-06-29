@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
@@ -24,6 +25,7 @@ export default function ReplyThreadView({
   id: number;
   focusReplyId?: number | null;
 }) {
+  const { t } = useTranslation("feed");
   const initialCache = getReplyDetailCache(id);
   const initialReply = initialCache?.reply ?? findReplyInAllCaches(id);
   const pathname = usePathname();
@@ -57,11 +59,11 @@ export default function ReplyThreadView({
         setReplyDetailCache(id, { reply: nextReply, children: nextChildren });
       }
     } catch {
-      setError("Reply not found or the API is unavailable.");
+      setError(t("replyNotFound"));
     } finally {
       setLoading(false);
     }
-  }, [id, focusReplyId]);
+  }, [id, focusReplyId, t]);
 
   useEffect(() => {
     if (focusReplyId) {
@@ -163,15 +165,15 @@ export default function ReplyThreadView({
   if (loading && !reply) {
     return (
       <main>
-        <PageHeader title="Reply detail" />
-        <p className="muted page-status">Loading…</p>
+        <PageHeader title={t("replyDetail")} />
+        <p className="muted page-status">{t("common:loading")}</p>
       </main>
     );
   }
   if (error || !reply) {
     return (
       <main>
-        <PageHeader title="Reply detail" />
+        <PageHeader title={t("replyDetail")} />
         <p className="muted page-status">{error}</p>
       </main>
     );
@@ -179,7 +181,7 @@ export default function ReplyThreadView({
 
   return (
     <main className="page-fade-in">
-      <PageHeader title="Reply detail" />
+      <PageHeader title={t("replyDetail")} />
       <ReplyForm themeId={reply.theme_id} parentId={reply.id} onPosted={load} />
       <div className="thread-chain">
         <ReplyCard
@@ -189,7 +191,7 @@ export default function ReplyThreadView({
         />
         {children.length > 0 && <ThreadRepliesLabel />}
         <div className="thread-replies">
-          {children.length === 0 && <p className="muted">No replies yet.</p>}
+          {children.length === 0 && <p className="muted">{t("noRepliesYet")}</p>}
           {children.map((r, i) => (
             <ReplyCard
               key={r.id}

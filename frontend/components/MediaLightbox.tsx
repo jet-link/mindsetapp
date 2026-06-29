@@ -8,6 +8,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { MediaItem } from "@/lib/api";
 import { isGifMedia } from "@/lib/media-types";
 
@@ -49,6 +50,7 @@ export default function MediaLightbox({
   startIndex: number;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("feed");
   const [index, setIndex] = useState(startIndex);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTs = useRef(0);
@@ -131,7 +133,7 @@ export default function MediaLightbox({
         type="button"
         className="close-btn media-lightbox__close"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t("common:close")}
       >
         <i className="fa fa-times" aria-hidden="true" />
       </button>
@@ -144,7 +146,7 @@ export default function MediaLightbox({
             e.stopPropagation();
             go(-1);
           }}
-          aria-label="Previous"
+          aria-label={t("previous")}
         >
           <ArrowIcon dir="prev" />
         </button>
@@ -181,7 +183,7 @@ export default function MediaLightbox({
             e.stopPropagation();
             go(1);
           }}
-          aria-label="Next"
+          aria-label={t("next")}
         >
           <ArrowIcon dir="next" />
         </button>

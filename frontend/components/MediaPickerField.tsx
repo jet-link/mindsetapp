@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   type MediaLimitKind,
   mediaLimitExceededMessage,
@@ -37,6 +38,7 @@ export interface MediaPicker {
 
 /** Состояние выбора медиа: общий хук для composer и формы ответа. */
 export function useMediaPicker(max: number, kind: MediaLimitKind): MediaPicker {
+  const { t } = useTranslation("errors");
   const [items, setItems] = useState<PickedItem[]>([]);
   const [typeError, setTypeError] = useState("");
 
@@ -44,7 +46,7 @@ export function useMediaPicker(max: number, kind: MediaLimitKind): MediaPicker {
     if (!selected || selected.length === 0) return;
     const incoming = Array.from(selected).filter(isAllowedImageFile);
     if (incoming.length === 0) {
-      setTypeError("Unsupported file type.");
+      setTypeError(t("unsupportedFileType"));
       return;
     }
     setTypeError("");
@@ -52,7 +54,7 @@ export function useMediaPicker(max: number, kind: MediaLimitKind): MediaPicker {
       ...cur,
       ...incoming.map((file) => ({ id: nextItemId++, file })),
     ]);
-  }, []);
+  }, [t]);
 
   const remove = useCallback((id: number) => {
     setTypeError("");
@@ -83,6 +85,7 @@ export function MediaAttachButton({
   picker: MediaPicker;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation("feed");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const atLimit = picker.items.length >= picker.max;
   return (
@@ -102,8 +105,8 @@ export function MediaAttachButton({
         type="button"
         className="icon-btn"
         disabled={disabled}
-        title={atLimit ? `Max ${picker.max} items` : "Attach photo or GIF"}
-        aria-label="Attach photo or GIF"
+        title={atLimit ? t("maxItems", { count: picker.max }) : t("attachPhoto")}
+        aria-label={t("attachPhoto")}
         onClick={() => inputRef.current?.click()}
       >
         <i className="fa fa-paperclip" aria-hidden="true" />
@@ -114,6 +117,7 @@ export function MediaAttachButton({
 
 /** Превью выбранных медиа. Ставится отдельным блоком (под кнопками). */
 export function MediaPreviews({ picker }: { picker: MediaPicker }) {
+  const { t } = useTranslation("feed");
   const { items, remove, error } = picker;
 
   // Стабильные object-URL по id: создаём только для новых файлов, отзываем
@@ -193,7 +197,7 @@ export function MediaPreviews({ picker }: { picker: MediaPicker }) {
                 <button
                   type="button"
                   className="media-picker__remove"
-                  aria-label="Remove"
+                  aria-label={t("remove")}
                   disabled={isRemoving}
                   onClick={() => handleRemove(it.id)}
                 >

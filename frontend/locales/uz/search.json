@@ -1,0 +1,20 @@
+{
+  "title": "Qidiruv",
+  "themesAndHashtags": "Mavzular va heshteglar",
+  "users": "Foydalanuvchilar",
+  "searchType": "Qidiruv turi",
+  "themesPlaceholder": "Mavzu yoki #heshteg qidirish…",
+  "usersPlaceholder": "Foydalanuvchi yoki @username qidirish…",
+  "themesLabel": "Mavzu yoki heshteg qidirish",
+  "usersLabel": "Foydalanuvchi yoki @username qidirish",
+  "recentSearches": "So'nggi qidiruvlar",
+  "clearHistory": "Tarixni tozalash",
+  "noRecentSearches": "So'nggi qidiruvlar yo'q!",
+  "removeFromHistory": "«{{query}}» ni tarixdan o'chirish",
+  "typeAtLeast": "Qidirish uchun kamida {{count}} ta belgi kiriting.",
+  "searchFailed": "Qidiruv xatosi",
+  "noThemesFound": "Mavzular topilmadi.",
+  "noUsersFound": "Foydalanuvchilar topilmadi.",
+  "searchingAria": "Qidirilmoqda",
+  "noPostsWithTag": "Bu teg bilan hali postlar yo'q."
+}

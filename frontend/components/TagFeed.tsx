@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import ThemeCard from "@/components/ThemeCard";
 import {
   THEME_LIKE_EVENT,
@@ -24,6 +25,7 @@ import { useRestoreAnchor } from "@/lib/use-restore-anchor";
 import { patchThemeAuthors } from "@/lib/user-avatar-store";
 
 export default function TagFeed({ slug }: { slug: string }) {
+  const { t } = useTranslation("search");
   const pathname = usePathname();
   const initialCache = getTagCache(slug);
   const [themes, setThemes] = useState<Theme[]>(initialCache?.themes ?? []);
@@ -46,11 +48,11 @@ export default function TagFeed({ slug }: { slug: string }) {
       setThemes((prev) => (cursor ? [...prev, ...page.results] : page.results));
       setNextCursor(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load posts");
+      setError(e instanceof Error ? e.message : t("profile:failedToLoadPosts"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setListKey(listKey);
@@ -147,7 +149,7 @@ export default function TagFeed({ slug }: { slug: string }) {
     <>
       {error && <p className="muted">{error}</p>}
       {!loading && !error && themes.length === 0 && (
-        <p className="muted">No posts with this tag yet.</p>
+        <p className="muted">{t("noPostsWithTag")}</p>
       )}
 
       <div className="feed-list">
@@ -160,12 +162,12 @@ export default function TagFeed({ slug }: { slug: string }) {
         ))}
       </div>
 
-      {loading && themes.length === 0 && <p className="muted">Loading…</p>}
+      {loading && themes.length === 0 && <p className="muted">{t("common:loading")}</p>}
 
       {nextCursor && (
         <>
           <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
-          {loading && themes.length > 0 && <p className="muted">Loading…</p>}
+          {loading && themes.length > 0 && <p className="muted">{t("common:loading")}</p>}
         </>
       )}
     </>

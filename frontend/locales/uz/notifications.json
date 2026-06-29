@@ -1,0 +1,12 @@
+{
+  "title": "Bildirishnomalar",
+  "repliedToTheme": "mavzuingizga javob berdi",
+  "repostedTheme": "mavzuingizni repost qildi",
+  "readAll": "Hammasini o'qilgan deb belgilash",
+  "clearAll": "Bildirishnomalarni tozalash",
+  "noNotifications": "Hali bildirishnomalar yo'q.",
+  "failedToLoad": "Bildirishnomalarni yuklab bo'lmadi",
+  "failedToMarkRead": "O'qilgan deb belgilab bo'lmadi",
+  "failedToClear": "Bildirishnomalarni tozalab bo'lmadi",
+  "view": "Ko'rish"
+}

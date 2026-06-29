@@ -1,0 +1,20 @@
+{
+  "login.userNotFound": "Foydalanuvchi topilmadi",
+  "login.passwordIncorrect": "Parol noto'g'ri",
+  "register.userExists": "Foydalanuvchi allaqachon mavjud",
+  "register.usernameInvalid": "Foydalanuvchi nomi noto'g'ri",
+  "register.emailRegistered": "Bu email allaqachon ro'yxatdan o'tgan!",
+  "register.emailInvalid": "Email noto'g'ri",
+  "register.passwordCommon": "Parol juda oddiy",
+  "register.passwordShort": "Parol juda qisqa",
+  "register.passwordNumeric": "Parol faqat raqamlardan iborat",
+  "register.passwordSimilar": "Parol shaxsiy ma'lumotlaringizga juda o'xshash",
+  "register.passwordInvalid": "Parol noto'g'ri",
+  "content.addTextOrMedia": "Matn yoki media qo'shing.",
+  "content.themeNotEditable": "Mavzuni endi tahrirlab bo'lmaydi.",
+  "content.themeNotDeletable": "Mavzuni endi o'chirib bo'lmaydi.",
+  "content.replyNotDeletable": "Javobni endi o'chirib bo'lmaydi.",
+  "content.serverError": "Server xatosi. Qayta urinib ko'ring.",
+  "cooldown.posting": "Siz juda tez joylayapsiz. {wait} soniyadan so'ng urinib ko'ring.",
+  "cooldown.replying": "Siz juda tez javob berayapsiz. {wait} soniyadan so'ng urinib ko'ring."
+}

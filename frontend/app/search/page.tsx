@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import SearchPage from "./search-page";
+import TranslatedMessage from "@/components/TranslatedMessage";
 
 export default function Page() {
   return (
     <Suspense
       fallback={
         <main>
-          <p className="muted page-status">Loading…</p>
+          <TranslatedMessage ns="common" k="loading" className="muted page-status" />
         </main>
       }
     >

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import Avatar from "@/components/Avatar";
 import {
@@ -20,20 +21,9 @@ import {
   isLoggedIn,
   markAllNotificationsRead,
 } from "@/lib/api";
+import { formatDateTime } from "@/lib/i18n";
 import { patchNotificationActors } from "@/lib/user-avatar-store";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
-
-function verbText(n: NotificationItem): string {
-  if (n.verb === "repost") return "reposted your theme";
-  return "replied to your theme";
-}
-
-function formatNotificationDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function targetHref(n: NotificationItem): string | null {
   if (n.verb === "reply" && n.reply_id) {
@@ -49,6 +39,7 @@ function targetHref(n: NotificationItem): string | null {
 }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation("notifications");
   const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -68,11 +59,11 @@ export default function NotificationsPage() {
       setItems((prev) => (cursor ? [...prev, ...page.results] : page.results));
       setNextCursor(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load notifications");
+      setError(e instanceof Error ? e.message : t("failedToLoad"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -128,7 +119,7 @@ export default function NotificationsPage() {
       setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
       emitNotificationsChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to mark as read");
+      setError(e instanceof Error ? e.message : t("failedToMarkRead"));
     } finally {
       setBusy(false);
     }
@@ -142,7 +133,7 @@ export default function NotificationsPage() {
       setNextCursor(null);
       emitNotificationsChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to clear notifications");
+      setError(e instanceof Error ? e.message : t("failedToClear"));
     } finally {
       setBusy(false);
     }
@@ -165,7 +156,7 @@ export default function NotificationsPage() {
 
   return (
     <main>
-      <PageHeader title="Notifications" showBack={false} />
+      <PageHeader title={t("title")} showBack={false} />
 
       <div className="notif-actions">
         <button
@@ -174,7 +165,7 @@ export default function NotificationsPage() {
           onClick={onReadAll}
           disabled={readAllDisabled}
         >
-          Read all
+          {t("readAll")}
         </button>
         <button
           type="button"
@@ -182,14 +173,14 @@ export default function NotificationsPage() {
           onClick={onClear}
           disabled={clearDisabled}
         >
-          Clear notifications
+          {t("clearAll")}
         </button>
       </div>
 
       {error && <p className="muted">{error}</p>}
-      {loading && items.length === 0 && <p className="muted">Loading…</p>}
+      {loading && items.length === 0 && <p className="muted">{t("common:loading")}</p>}
       {!loading && items.length === 0 && !error && (
-        <p className="muted">No notifications yet.</p>
+        <p className="muted">{t("noNotifications")}</p>
       )}
 
       <div className="notif-list">
@@ -205,15 +196,15 @@ export default function NotificationsPage() {
                   <Link href={`/u/${n.actor.username}`} className="username">
                     {n.actor.username}
                   </Link>{" "}
-                  {verbText(n)}
+                  {n.verb === "repost" ? t("repostedTheme") : t("repliedToTheme")}
                 </p>
                 <time className="notif-row__time" dateTime={n.created_at}>
-                  {formatNotificationDate(n.created_at)}
+                  {formatDateTime(n.created_at)}
                 </time>
               </div>
               {href && (
                 <Link href={href} className="notif-row__action">
-                  View
+                  {t("view")}
                 </Link>
               )}
             </div>
@@ -224,11 +215,11 @@ export default function NotificationsPage() {
       {nextCursor && (
         <>
           <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
-          {loading && items.length > 0 && <p className="muted">Loading…</p>}
+          {loading && items.length > 0 && <p className="muted">{t("common:loading")}</p>}
           {!loading && (
             <p className="muted">
               <button className="link-btn" onClick={() => load(nextCursor)}>
-                Show more
+                {t("common:showMore")}
               </button>
             </p>
           )}

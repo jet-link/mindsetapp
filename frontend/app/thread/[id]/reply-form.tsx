@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import {
   MediaAttachButton,
   MediaPreviews,
   useMediaPicker,
 } from "@/components/MediaPickerField";
-import { createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
+import { CooldownError, createReply, emitReplyCreated, isLoggedIn } from "@/lib/api";
 import { REPLY_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
-import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
+import { useCooldown } from "@/lib/use-cooldown";
 import { mediaLimitExceededMessage } from "@/lib/media-limit";
 import {
   THEME_BODY_LIMIT,
@@ -27,6 +28,7 @@ export default function ReplyForm({
   parentId?: number;
   onPosted?: () => void;
 }) {
+  const { t } = useTranslation("feed");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +52,7 @@ export default function ReplyForm({
     return (
       <div className="composer composer--login">
         <Link href="/login" className="login-hint">
-          Log in to reply
+          {t("auth:loginToReply")}
         </Link>
       </div>
     );
@@ -85,13 +87,11 @@ export default function ReplyForm({
       });
       onPosted?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to post the reply";
-      const secs = parseCooldownSeconds(message);
-      if (secs) {
-        cooldown.start(secs);
+      if (err instanceof CooldownError) {
+        cooldown.start(err.retryAfter || REPLY_COOLDOWN_SECONDS);
         setError("");
       } else {
-        setError(message);
+        setError(err instanceof Error ? err.message : t("failedToPostReply"));
       }
     } finally {
       setBusy(false);
@@ -101,14 +101,14 @@ export default function ReplyForm({
   return (
     <form className="composer" onSubmit={submit} noValidate>
       <label className="sr-only" htmlFor="reply-body">
-        Your reply
+        {t("yourReply")}
       </label>
       <ComposerTextarea
         id="reply-body"
-        placeholder="Your reply… Use @ to mention someone"
+        placeholder={t("replyPlaceholder")}
         value={body}
         onChange={handleBodyChange}
-        aria-label="Your reply"
+        aria-label={t("yourReply")}
       />
       <div className="composer-footer">
         <div className="composer-actions">
@@ -117,13 +117,13 @@ export default function ReplyForm({
             type="submit"
             disabled={busy || (!body.trim() && picker.files.length === 0) || overLimit || picker.overLimit || cooldown.active}
           >
-            {busy ? <span className="btn-spinner" aria-hidden="true" /> : "Reply"}
+            {busy ? <span className="btn-spinner" aria-hidden="true" /> : t("reply")}
           </button>
           <MediaAttachButton picker={picker} disabled={busy} />
         </div>
         <div className="composer-meta">
           {cooldown.active ? (
-            <span className="bio-counter">You can reply again in {cooldown.seconds}s</span>
+            <span className="bio-counter">{t("canReplyAgain", { seconds: cooldown.seconds })}</span>
           ) : (
             <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
               {chars}/{THEME_BODY_LIMIT}
@@ -134,7 +134,7 @@ export default function ReplyForm({
       <MediaPreviews picker={picker} />
       {busy && picker.files.length > 0 && (
         <div className="composer-uploading" role="status">
-          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> Publishing media…
+          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> {t("publishingMedia")}
         </div>
       )}
       {error && (

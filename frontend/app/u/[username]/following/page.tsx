@@ -11,7 +11,7 @@ export default async function FollowingPage({
   const { username } = await params;
   return (
     <main>
-      <PageHeader title="Following" />
+      <PageHeader titleKey="profile:followingTitle" />
       <FollowList username={username} kind="following" />
     </main>
   );

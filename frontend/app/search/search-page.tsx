@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
 import Avatar from "@/components/Avatar";
@@ -57,6 +58,7 @@ function parseTab(value: string | null): SearchTab {
 }
 
 export default function SearchPage() {
+  const { t } = useTranslation("search");
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlTab = parseTab(searchParams.get("tab"));
@@ -245,7 +247,7 @@ export default function SearchPage() {
           if (activeTab === "themes") setThemeResults([]);
           else setUserResults([]);
         }
-        setError(e instanceof Error ? e.message : "Search failed");
+        setError(e instanceof Error ? e.message : t("searchFailed"));
       } finally {
         if (requestId === requestIdRef.current) {
           if (isLoadMore) setLoadingMore(false);
@@ -253,7 +255,7 @@ export default function SearchPage() {
         }
       }
     },
-    [applyCache],
+    [applyCache, t],
   );
 
   useEffect(() => {
@@ -339,13 +341,13 @@ export default function SearchPage() {
   const showRecentSection = showDiscover && authed;
 
   const searchLabel =
-    tab === "themes" ? "Search themes or hashtags" : "Search users or @username";
+    tab === "themes" ? t("themesLabel") : t("usersLabel");
 
   return (
     <main className={`search-page${showRecentSection ? " search-page--discover" : ""}`}>
-      <PageHeader title="Search" showBack={false} />
+      <PageHeader title={t("title")} showBack={false} />
 
-      <div role="tablist" aria-label="Search type" className="search-tabs">
+      <div role="tablist" aria-label={t("searchType")} className="search-tabs">
         <button
           type="button"
           role="tab"
@@ -355,7 +357,7 @@ export default function SearchPage() {
           aria-controls={themesPanelId}
           onClick={() => setTab("themes")}
         >
-          Themes & hashtags
+          {t("themesAndHashtags")}
         </button>
         <button
           type="button"
@@ -366,7 +368,7 @@ export default function SearchPage() {
           aria-controls={usersPanelId}
           onClick={() => setTab("users")}
         >
-          Users
+          {t("users")}
         </button>
       </div>
 
@@ -385,7 +387,7 @@ export default function SearchPage() {
           type="search"
           enterKeyHint="search"
           placeholder={
-            tab === "themes" ? "Search themes or #hashtags…" : "Search users or @username…"
+            tab === "themes" ? t("themesPlaceholder") : t("usersPlaceholder")
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -394,7 +396,7 @@ export default function SearchPage() {
           aria-controls={showRecentSection ? undefined : resultsPanelId}
         />
         {fetching && (
-          <span className="search-bar__spinner" role="status" aria-label="Searching" />
+          <span className="search-bar__spinner" role="status" aria-label={t("searchingAria")} />
         )}
       </form>
 
@@ -404,14 +406,14 @@ export default function SearchPage() {
             {recentItems.length > 0 ? (
               <>
                 <div className="discover-search__head-row">
-                  <span className="discover-search__label">Recent searches</span>
+                  <span className="discover-search__label">{t("recentSearches")}</span>
                   {authed && (
                     <button
                       type="button"
                       className="discover-search__clear"
                       onClick={clearHistory}
                     >
-                      Clear history
+                      {t("clearHistory")}
                     </button>
                   )}
                 </div>
@@ -431,7 +433,7 @@ export default function SearchPage() {
                           <button
                             type="button"
                             className="discover-search__remove"
-                            aria-label={`Remove "${item.query}" from history`}
+                            aria-label={t("removeFromHistory", { query: item.query })}
                             onClick={(e) => removeHistoryItem(item, e)}
                           >
                             <i className="fa fa-times" aria-hidden="true" />
@@ -443,7 +445,7 @@ export default function SearchPage() {
                 </div>
               </>
             ) : (
-              <p className="discover-search__empty muted">No recent searches!</p>
+              <p className="discover-search__empty muted">{t("noRecentSearches")}</p>
             )}
           </div>
         </div>
@@ -462,7 +464,7 @@ export default function SearchPage() {
         >
           {queryTooShort && (
             <p className="search-results__message muted">
-              Type at least {MIN_QUERY_LEN} characters to search.
+              {t("typeAtLeast", { count: MIN_QUERY_LEN })}
             </p>
           )}
           {error && (
@@ -472,7 +474,7 @@ export default function SearchPage() {
           )}
           {showEmpty && (
             <p className="search-results__message muted">
-              {tab === "themes" ? "No themes found." : "No users found."}
+              {tab === "themes" ? t("noThemesFound") : t("noUsersFound")}
             </p>
           )}
 
@@ -505,7 +507,7 @@ export default function SearchPage() {
           {activeNextCursor && (
             <>
               <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
-              {loadingMore && <p className="muted search-results__message">Loading more…</p>}
+              {loadingMore && <p className="muted search-results__message">{t("common:loadingMore")}</p>}
             </>
           )}
         </div>

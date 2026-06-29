@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { usePageScrollLock } from "@/lib/body-scroll-lock";
 
 const OTHER_LIMIT = 500;
 
 export const REPORT_REASONS = [
-  { id: "spam", label: "Spam" },
-  { id: "bullying", label: "Bullying or Harassment" },
-  { id: "hate", label: "Hate Speech or Hate Symbols" },
-  { id: "misinformation", label: "Misinformation" },
-  { id: "violence", label: "Violence or Violent Content" },
-  { id: "adult", label: "Adult or Sexual Content" },
-  { id: "scam", label: "Scam or Fraud" },
-  { id: "copyright", label: "Copyright Infringement" },
+  { id: "spam", labelKey: "reasonSpam" },
+  { id: "bullying", labelKey: "reasonBullying" },
+  { id: "hate", labelKey: "reasonHate" },
+  { id: "misinformation", labelKey: "reasonMisinformation" },
+  { id: "violence", labelKey: "reasonViolence" },
+  { id: "adult", labelKey: "reasonAdult" },
+  { id: "scam", labelKey: "reasonScam" },
+  { id: "copyright", labelKey: "reasonCopyright" },
 ] as const;
 
 type ReportKind = "theme" | "reply";
@@ -28,11 +29,12 @@ export default function ReportContentModal({
   onClose: () => void;
   kind: ReportKind;
 }) {
+  const { t } = useTranslation("moderation");
   const [reason, setReason] = useState<string | null>(null);
   const [other, setOther] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  const title = kind === "theme" ? "Report a theme" : "Report a reply";
+  const title = kind === "theme" ? t("reportTheme") : t("reportReply");
   const otherOverLimit = other.length > OTHER_LIMIT;
   const canSubmit =
     (reason !== null || other.trim().length > 0) && !otherOverLimit;
@@ -82,7 +84,7 @@ export default function ReportContentModal({
         type="button"
         className="close-btn surface-form-lightbox__close"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t("common:close")}
       >
         <i className="fa fa-times" aria-hidden="true" />
       </button>
@@ -99,7 +101,7 @@ export default function ReportContentModal({
           noValidate
         >
           <fieldset className="report-reasons">
-            <legend className="sr-only">Report reason</legend>
+            <legend className="sr-only">{t("reportReason")}</legend>
             <div className="report-reasons__grid">
               {REPORT_REASONS.map((item) => (
                 <label key={item.id} className="report-radio">
@@ -111,13 +113,13 @@ export default function ReportContentModal({
                     onChange={() => selectReason(item.id)}
                   />
                   <span className="report-radio__control" aria-hidden="true" />
-                  <span className="report-radio__label">{item.label}</span>
+                  <span className="report-radio__label">{t(item.labelKey)}</span>
                 </label>
               ))}
             </div>
           </fieldset>
           <label className="sr-only" htmlFor="report-content-other">
-            Other reason
+            {t("otherReason")}
           </label>
           <textarea
             id="report-content-other"
@@ -125,12 +127,12 @@ export default function ReportContentModal({
             value={other}
             onFocus={onOtherFocus}
             onChange={(e) => onOtherChange(e.target.value)}
-            placeholder="Other…"
+            placeholder={t("otherPlaceholder")}
             rows={3}
           />
           <div className="surface-form-card__footer">
             <button type="submit" className="btn" disabled={!canSubmit}>
-              Report
+              {t("report")}
             </button>
             <span
               className={

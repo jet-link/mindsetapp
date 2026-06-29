@@ -1,3 +1,5 @@
+import i18n, { initI18n } from "./i18n/config";
+
 export type MediaLimitKind = "theme" | "reply";
 
 export function mediaLimitExceededMessage(
@@ -7,6 +9,8 @@ export function mediaLimitExceededMessage(
 ): string {
   const excess = count - max;
   if (excess <= 0) return "";
-  const noun = excess === 1 ? "image" : "images";
-  return `You have exceeded the image limit for this ${kind}. Please remove ${excess} ${noun}.`;
+  if (!i18n.isInitialized) initI18n();
+  const noun = i18n.t("errors:image", { count: excess });
+  const kindWord = i18n.t(kind === "theme" ? "errors:kindTheme" : "errors:kindReply");
+  return i18n.t("errors:mediaLimitExceeded", { kind: kindWord, count: excess, noun });
 }

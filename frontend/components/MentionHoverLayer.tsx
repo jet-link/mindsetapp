@@ -3,14 +3,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import Avatar from "@/components/Avatar";
 import {
   UserProfile,
   USER_PROFILE_EVENT,
   UserProfileUpdatedDetail,
-  formatCount,
   getProfile,
 } from "@/lib/api";
+import { formatCompactNumber } from "@/lib/i18n";
 
 function mentionUsername(link: HTMLAnchorElement): string {
   const data = link.getAttribute("data-username");
@@ -32,6 +33,7 @@ function hideCard(
 }
 
 export default function MentionHoverLayer() {
+  const { t } = useTranslation("profile");
   const pathname = usePathname();
   const [anchor, setAnchor] = useState<HTMLAnchorElement | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -204,13 +206,14 @@ export default function MentionHoverLayer() {
       </div>
       {profile.bio ? <div className="mention-hover-card__bio">{profile.bio}</div> : null}
       <div className="mention-hover-card__stats">
-        {formatCount(profile.followers_count)} followers
+        {formatCompactNumber(profile.followers_count)}{" "}
+        {t("followers", { count: profile.followers_count })}
         <span className="mention-hover-card__sep"> · </span>
-        {formatCount(profile.following_count)} following
+        {formatCompactNumber(profile.following_count)} {t("following")}
       </div>
     </>
   ) : (
-    <p className="muted mention-hover-card__loading">Loading…</p>
+    <p className="muted mention-hover-card__loading">{t("common:loading")}</p>
   );
 
   if (profile) {

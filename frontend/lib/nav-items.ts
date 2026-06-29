@@ -1,20 +1,21 @@
 export interface NavItem {
   href: string;
   icon: string;
-  label: string;
+  /** Ключ перевода в namespace `common`. */
+  labelKey: string;
   authOnly?: boolean;
   authGated?: boolean;
   badge?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", icon: "fa-list-alt", label: "Main wall" },
-  { href: "/search", icon: "fa-search", label: "Search" },
-  { href: "/compose", icon: "fa-plus-square-o", label: "Create theme", authGated: true },
+  { href: "/", icon: "fa-list-alt", labelKey: "mainWall" },
+  { href: "/search", icon: "fa-search", labelKey: "search" },
+  { href: "/compose", icon: "fa-plus-square-o", labelKey: "createTheme", authGated: true },
   {
     href: "/notifications",
     icon: "fa-bell",
-    label: "Notifications",
+    labelKey: "notifications",
     badge: true,
     authGated: true,
   },

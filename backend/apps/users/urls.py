@@ -10,12 +10,14 @@ from .views import (
     FollowersListView,
     FollowingListView,
     FollowToggleView,
+    MeLanguageView,
     MeView,
     UserProfileView,
 )
 
 urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
+    path('me/language/', MeLanguageView.as_view(), name='me-language'),
     path('search/discover/', DiscoverSearchView.as_view(), name='search-discover'),
     path('search/events/', SearchEventCreateView.as_view(), name='search-events'),
     path('search/themes/', ThemeSearchView.as_view(), name='search-themes'),

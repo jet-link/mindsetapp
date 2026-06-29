@@ -1,0 +1,23 @@
+{
+  "mainWall": "Main wall",
+  "search": "Search",
+  "createTheme": "Create theme",
+  "notifications": "Notifications",
+  "profile": "Profile",
+  "menu": "Menu",
+  "mainNavigation": "Main navigation",
+  "back": "Back",
+  "goBack": "Go back",
+  "close": "Close",
+  "loading": "Loading…",
+  "loadingMore": "Loading more…",
+  "showMore": "Show more",
+  "retry": "Retry",
+  "moreActions": "More actions",
+  "send": "Send",
+  "newTheme": "New theme",
+  "themeDetail": "Theme detail",
+  "replyDetail": "Reply detail",
+  "unreadNotifications_one": "{{count}} unread notification",
+  "unreadNotifications_other": "{{count}} unread notifications"
+}

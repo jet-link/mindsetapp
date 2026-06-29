@@ -1,0 +1,18 @@
+{
+  "needLogin": "Необходимо войти в систему.",
+  "noPermission": "У вас нет прав для этого действия.",
+  "serverError": "Ошибка сервера ({{status}}). Попробуйте ещё раз.",
+  "networkError": "Ошибка сети",
+  "unknownError": "Неизвестная ошибка",
+  "serverUnavailable": "Сервер недоступен",
+  "tooManyRequests": "Слишком много запросов",
+  "wrongPassword": "Неверный пароль",
+  "unsupportedFileType": "Неподдерживаемый тип файла.",
+  "image_one": "изображение",
+  "image_few": "изображения",
+  "image_many": "изображений",
+  "image_other": "изображений",
+  "kindTheme": "темы",
+  "kindReply": "ответа",
+  "mediaLimitExceeded": "Вы превысили лимит изображений для этой {{kind}}. Удалите {{count}} {{noun}}."
+}

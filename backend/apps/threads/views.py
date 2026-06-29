@@ -15,6 +15,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.i18n import t
 from apps.core.pagination import FeedCursorPagination
 from apps.core.throttling import (
     REPLY_COOLDOWN,
@@ -56,20 +57,20 @@ def _unexpected_error_response(where: str, **ctx):
     if dj_settings.DEBUG:
         detail = f'{where}: {traceback.format_exc()}'
     else:
-        detail = 'Server error. Please try again.'
+        detail = t('content.serverError')
     return Response({'detail': detail}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 User = get_user_model()
 
 
-def _cooldown_response(wait: int, verb: str) -> Response:
-    """200-ответ о кулдауне (без 429 в консоли браузера). Фронт читает retry_after."""
-    unit = 'second' if wait == 1 else 'seconds'
+def _cooldown_response(wait: int, key: str) -> Response:
+    """200-ответ о кулдауне (без 429 в консоли браузера). Фронт читает retry_after
+    и строит свой текст; ``detail`` — локализованный fallback."""
     return Response({
         'ok': False,
         'cooldown': True,
         'retry_after': wait,
-        'detail': f"You're {verb} too fast. Try again in {wait} {unit}.",
+        'detail': t(key, wait=wait),
     })
 
 
@@ -182,13 +183,13 @@ class ThemeViewSet(viewsets.GenericViewSet):
     def create(self, request):
         wait = cooldown_retry_after(request.user, **THEME_COOLDOWN)
         if wait:
-            return _cooldown_response(wait, 'posting')
+            return _cooldown_response(wait, 'cooldown.posting')
         ser = ThemeCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         media = request.FILES.getlist('media')
         if not ser.validated_data['body'].strip() and not media:
             return Response(
-                {'detail': 'Add some text or media.'},
+                {'detail': t('content.addTextOrMedia')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
@@ -224,7 +225,7 @@ class ThemeViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_403_FORBIDDEN)
         if not theme.is_editable:
             return Response(
-                {'detail': 'Theme is no longer editable.'},
+                {'detail': t('content.themeNotEditable')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         ser = ThemeCreateSerializer(data=request.data)
@@ -240,7 +241,7 @@ class ThemeViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_403_FORBIDDEN)
         if not theme.is_deletable:
             return Response(
-                {'detail': 'Theme is no longer deletable.'},
+                {'detail': t('content.themeNotDeletable')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         services.soft_delete_theme(theme=theme)
@@ -276,7 +277,7 @@ class ThemeViewSet(viewsets.GenericViewSet):
         reply_media = request.FILES.getlist('media')
         if not ser.validated_data['body'].strip() and not reply_media:
             return Response(
-                {'detail': 'Add some text or media.'},
+                {'detail': t('content.addTextOrMedia')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         parent = None
@@ -290,7 +291,7 @@ class ThemeViewSet(viewsets.GenericViewSet):
             request.user, **REPLY_COOLDOWN, target=cooldown_target
         )
         if wait:
-            return _cooldown_response(wait, 'replying')
+            return _cooldown_response(wait, 'cooldown.replying')
         try:
             reply = services.create_reply(
                 theme=theme,
@@ -367,7 +368,7 @@ class ReplyDetailView(APIView):
             return Response(status=status.HTTP_403_FORBIDDEN)
         if not reply.is_deletable:
             return Response(
-                {'detail': 'Reply is no longer deletable.'},
+                {'detail': t('content.replyNotDeletable')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         payload = services.soft_delete_reply(reply=reply)

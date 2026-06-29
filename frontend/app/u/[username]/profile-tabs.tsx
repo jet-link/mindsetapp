@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import ReplyCard from "@/components/ReplyCard";
 import ListExitWrap from "@/components/ListExitWrap";
 import ListEnterItem from "@/components/ListEnterItem";
@@ -290,11 +291,11 @@ export interface ProfileCounts {
   reposts: number;
 }
 
-const EMPTY_TEXT: Record<ProfileTab, string> = {
-  themes: "No themes yet.",
-  replies: "No replies yet.",
-  media: "No media yet.",
-  reposts: "No reposts yet.",
+const EMPTY_TEXT_KEYS: Record<ProfileTab, string> = {
+  themes: "noThemesYet",
+  replies: "noRepliesYet",
+  media: "noMediaYet",
+  reposts: "noRepostsYet",
 };
 
 function resolveInitialTab(username: string): ProfileTab {
@@ -360,6 +361,7 @@ export default function ProfileTabs({
   username: string;
   counts: ProfileCounts;
 }) {
+  const { t } = useTranslation("profile");
   const pathname = usePathname();
   const initial = resolveInitialState(username);
   const [tab, setTab] = useState<ProfileTab>(initial.tab);
@@ -766,12 +768,12 @@ export default function ProfileTabs({
           };
         });
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load posts");
+        setError(e instanceof Error ? e.message : t("failedToLoadPosts"));
       } finally {
         setLoadingTab((currentTab) => (currentTab === activeTab ? null : currentTab));
       }
     },
-    [username],
+    [username, t],
   );
 
   const switchTab = useCallback(
@@ -1178,10 +1180,10 @@ export default function ProfileTabs({
   });
 
   const TAB_DEFS: { id: ProfileTab; label: string; count: number }[] = [
-    { id: "themes", label: "Themes", count: tabCounts.themes },
-    { id: "replies", label: "Replies", count: tabCounts.replies },
-    { id: "media", label: "Media", count: tabCounts.media },
-    { id: "reposts", label: "Reposts", count: tabCounts.reposts },
+    { id: "themes", label: t("themes"), count: tabCounts.themes },
+    { id: "replies", label: t("replies"), count: tabCounts.replies },
+    { id: "media", label: t("media"), count: tabCounts.media },
+    { id: "reposts", label: t("reposts"), count: tabCounts.reposts },
   ];
 
   const isOwnProfile = getStoredUsername() === username;
@@ -1196,7 +1198,7 @@ export default function ProfileTabs({
     <>
       <AnimatedTabBar
         className="profile-tabs"
-        ariaLabel="Profile posts"
+        ariaLabel={t("postsAria")}
         activeId={tab}
         onSelect={switchTab}
         tabs={TAB_DEFS.map((t) => ({ id: t.id, label: t.label }))}
@@ -1228,7 +1230,7 @@ export default function ProfileTabs({
             >
               {isActive && error && <p className="muted">{error}</p>}
               {isActive && !isLoading && !error && items.length === 0 && (
-                <p className="muted">{EMPTY_TEXT[tabId]}</p>
+                <p className="muted">{t(EMPTY_TEXT_KEYS[tabId])}</p>
               )}
 
               <div className="feed-list">
@@ -1357,7 +1359,7 @@ export default function ProfileTabs({
               </div>
 
               {isActive && isLoading && items.length === 0 && (
-                <p className="muted">Loading…</p>
+                <p className="muted">{t("common:loading")}</p>
               )}
 
               {isActive && slice.nextCursor && (
@@ -1370,7 +1372,7 @@ export default function ProfileTabs({
                         className="link-btn"
                         onClick={() => load(tabId, slice.nextCursor!)}
                       >
-                        Show more
+                        {t("common:showMore")}
                       </button>
                     </p>
                   )}

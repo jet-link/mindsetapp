@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import CardMenu from "@/components/CardMenu";
 import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
@@ -20,11 +21,11 @@ import {
   emitReplyDeleted,
   emitReplyLikeChanged,
   emitReplyRepostChanged,
-  formatCount,
   isLoggedIn,
   toggleReplyLike,
   toggleReplyRepost,
 } from "@/lib/api";
+import { formatCompactNumber, formatRelativeTime } from "@/lib/i18n";
 import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
 import { seedReplyDetailReply } from "@/lib/detail-cache";
@@ -58,6 +59,7 @@ export default function ReplyCard({
   onDeleteExitStart?: (detail: ReplyDeletedDetail) => void;
   onDeleteExitFailed?: () => void;
 }) {
+  const { t } = useTranslation("feed");
   const router = useRouter();
   const [liked, setLiked] = useState(reply.is_liked);
   const [likes, setLikes] = useState(reply.likes_count);
@@ -270,7 +272,7 @@ export default function ReplyCard({
             <Link href={`/u/${reply.author.username}`} className="username">
               {reply.author.username}
             </Link>
-            <span className="time">· {reply.human_published}</span>
+            <span className="time">· {formatRelativeTime(reply.created_at)}</span>
             {showReplyBadge && <span className="time">·</span>}
             {showReplyBadge && (
               <button
@@ -278,10 +280,10 @@ export default function ReplyCard({
                 className="card-badge card-badge--btn"
                 onClick={onBadgeNavigate}
                 aria-label={
-                  reply.parent_id != null ? "Open parent reply" : "Open theme"
+                  reply.parent_id != null ? t("openParentReply") : t("openTheme")
                 }
               >
-                Reply
+                {t("replyBadge")}
               </button>
             )}
           </div>
@@ -330,7 +332,7 @@ export default function ReplyCard({
             onClick={onLike}
           >
             <i className={`fa ${liked ? "fa-heart" : "fa-heart-o"}`} aria-hidden="true" />{" "}
-            {formatCount(likes)}
+            {formatCompactNumber(likes)}
           </button>
           <button
             type="button"
@@ -338,7 +340,7 @@ export default function ReplyCard({
             onClick={onReplies}
           >
             <i className="fa fa-comment" aria-hidden="true" />{" "}
-            {formatCount(replies)}
+            {formatCompactNumber(replies)}
           </button>
           <button
             type="button"
@@ -346,14 +348,14 @@ export default function ReplyCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onRepost}
           >
-            <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
+            <i className="fa fa-refresh" aria-hidden="true" /> {formatCompactNumber(reposts)}
           </button>
-          <button type="button" aria-label="Send" onPointerDown={(e) => bouncePress(e.currentTarget)}>
-            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCount(0)}
+          <button type="button" aria-label={t("common:send")} onPointerDown={(e) => bouncePress(e.currentTarget)}>
+            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCompactNumber(0)}
           </button>
           {showViewTheme && (
             <Link href={`/thread/${reply.theme_id}`} className="view-theme">
-              View theme
+              {t("viewTheme")}
             </Link>
           )}
         </div>

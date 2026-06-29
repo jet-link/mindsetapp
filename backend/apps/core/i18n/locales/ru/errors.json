@@ -1,0 +1,20 @@
+{
+  "login.userNotFound": "Пользователь не найден",
+  "login.passwordIncorrect": "Неверный пароль",
+  "register.userExists": "Пользователь уже существует",
+  "register.usernameInvalid": "Некорректное имя пользователя",
+  "register.emailRegistered": "Этот email уже зарегистрирован!",
+  "register.emailInvalid": "Некорректный email",
+  "register.passwordCommon": "Слишком простой пароль",
+  "register.passwordShort": "Слишком короткий пароль",
+  "register.passwordNumeric": "Пароль состоит только из цифр",
+  "register.passwordSimilar": "Пароль слишком похож на ваши данные",
+  "register.passwordInvalid": "Некорректный пароль",
+  "content.addTextOrMedia": "Добавьте текст или медиа.",
+  "content.themeNotEditable": "Тему больше нельзя редактировать.",
+  "content.themeNotDeletable": "Тему больше нельзя удалить.",
+  "content.replyNotDeletable": "Ответ больше нельзя удалить.",
+  "content.serverError": "Ошибка сервера. Попробуйте ещё раз.",
+  "cooldown.posting": "Вы публикуете слишком часто. Повторите через {wait} с.",
+  "cooldown.replying": "Вы отвечаете слишком часто. Повторите через {wait} с."
+}

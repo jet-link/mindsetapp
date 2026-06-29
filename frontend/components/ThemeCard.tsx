@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import CardMenu from "@/components/CardMenu";
 import ListExitWrap from "@/components/ListExitWrap";
 import Avatar from "@/components/Avatar";
@@ -19,11 +20,11 @@ import {
   emitThemeDeleted,
   emitThemeLikeChanged,
   emitThemeRepostChanged,
-  formatCount,
   isLoggedIn,
   toggleLike,
   toggleRepost,
 } from "@/lib/api";
+import { formatCompactNumber, formatRelativeTime } from "@/lib/i18n";
 import { bouncePress } from "@/lib/nav-bounce";
 import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
 import { seedThreadTheme } from "@/lib/detail-cache";
@@ -54,6 +55,7 @@ export default function ThemeCard({
   onDeleteExitFailed?: () => void;
   onOpen?: () => void;
 }) {
+  const { t } = useTranslation("feed");
   const router = useRouter();
   const [liked, setLiked] = useState(theme.is_liked);
   const [likes, setLikes] = useState(theme.likes_count);
@@ -244,7 +246,7 @@ export default function ThemeCard({
             <Link href={`/u/${theme.author.username}`} className="username">
               {theme.author.username}
             </Link>
-            <span className="time">· {theme.human_published}</span>
+            <span className="time">· {formatRelativeTime(theme.created_at)}</span>
           </div>
           <CardMenu
             kind="theme"
@@ -289,7 +291,7 @@ export default function ThemeCard({
             onClick={onLike}
           >
             <i className={`fa ${liked ? "fa-heart" : "fa-heart-o"}`} aria-hidden="true" />{" "}
-            {formatCount(likes)}
+            {formatCompactNumber(likes)}
           </button>
           <button
             type="button"
@@ -297,7 +299,7 @@ export default function ThemeCard({
             onClick={onReply}
           >
             <i className="fa fa-comment" aria-hidden="true" />{" "}
-            {formatCount(replies)}
+            {formatCompactNumber(replies)}
           </button>
           <button
             type="button"
@@ -305,10 +307,10 @@ export default function ThemeCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onRepost}
           >
-            <i className="fa fa-refresh" aria-hidden="true" /> {formatCount(reposts)}
+            <i className="fa fa-refresh" aria-hidden="true" /> {formatCompactNumber(reposts)}
           </button>
-          <button type="button" aria-label="Send" onPointerDown={(e) => bouncePress(e.currentTarget)}>
-            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCount(0)}
+          <button type="button" aria-label={t("common:send")} onPointerDown={(e) => bouncePress(e.currentTarget)}>
+            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCompactNumber(0)}
           </button>
         </div>
       </div>

@@ -1,0 +1,17 @@
+{
+  "rightNow": "Hozirgina",
+  "minAgo_one": "{{count}} daq oldin",
+  "minAgo_other": "{{count}} daq oldin",
+  "hrAgo_one": "{{count}} soat oldin",
+  "hrAgo_other": "{{count}} soat oldin",
+  "dayAgo_one": "{{count}} kun oldin",
+  "dayAgo_other": "{{count}} kun oldin",
+  "wkAgo_one": "{{count}} hafta oldin",
+  "wkAgo_other": "{{count}} hafta oldin",
+  "moAgo_one": "{{count}} oy oldin",
+  "moAgo_other": "{{count}} oy oldin",
+  "yrAgo_one": "{{count}} yil oldin",
+  "yrAgo_other": "{{count}} yil oldin",
+  "today": "Bugun",
+  "yesterday": "Kecha"
+}

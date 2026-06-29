@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import ReportProblemModal from "@/components/ReportProblemModal";
-import { AUTH_EVENT, isLoggedIn } from "@/lib/api";
+import { AUTH_EVENT, isLoggedIn, updateMeLanguage } from "@/lib/api";
 import {
   DEFAULT_THEME_MODE,
   THEME_CHANGE_EVENT,
@@ -11,9 +12,16 @@ import {
   watchSystemTheme,
   type ThemeMode,
 } from "@/lib/theme";
+import {
+  LOCALE_CHANGE_EVENT,
+  SUPPORTED_LANGUAGES,
+  getActiveLocale,
+  getStoredLocale,
+  setLocale,
+  type Locale,
+} from "@/lib/i18n";
 
 type ExtrasPanelView = "menu" | "theme" | "language";
-type LanguageMode = "eng" | "rus" | "uzb";
 
 function SegmentToggle<T extends string>({
   options,
@@ -68,13 +76,14 @@ function ExtrasSubpanel({
   onBack: () => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation("settings");
   return (
     <div className="sidenav__extras-subpanel">
       <div className="sidenav__extras-subpanel-head">
         <button
           type="button"
           className="sidenav__extras-back"
-          aria-label="Back"
+          aria-label={t("back")}
           onClick={onBack}
         >
           <i className="fa fa-arrow-left" aria-hidden="true" />
@@ -87,10 +96,11 @@ function ExtrasSubpanel({
 }
 
 export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav" | "header" }) {
+  const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
   const [panelView, setPanelView] = useState<ExtrasPanelView>("menu");
   const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME_MODE);
-  const [languageMode, setLanguageMode] = useState<LanguageMode>("eng");
+  const [locale, setLocaleState] = useState<Locale>("en");
   const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -123,6 +133,27 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
     persistThemeMode(mode);
   };
 
+  // Синхронизируем активный язык из хранилища и между инстансами меню.
+  useEffect(() => {
+    setLocaleState(getStoredLocale());
+    const onLocaleChange = (e: Event) => {
+      const next = (e as CustomEvent<Locale>).detail;
+      if (next) setLocaleState(next);
+    };
+    window.addEventListener(LOCALE_CHANGE_EVENT, onLocaleChange);
+    return () => window.removeEventListener(LOCALE_CHANGE_EVENT, onLocaleChange);
+  }, []);
+
+  const handleLanguageChange = (next: Locale) => {
+    if (next === getActiveLocale()) return;
+    setLocaleState(next);
+    void setLocale(next);
+    // Авторизованным сохраняем выбор в профиле (для синхронизации между устройствами).
+    if (isLoggedIn()) {
+      updateMeLanguage(next).catch(() => {});
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
@@ -144,9 +175,9 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
       <button
         type="button"
         className="sidenav__bars"
-        aria-label="Menu"
+        aria-label={t("menu")}
         aria-expanded={open}
-        title="Menu"
+        title={t("menu")}
         onClick={() => setOpen((v) => !v)}
       >
         <span />
@@ -162,7 +193,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 role="menuitem"
                 onClick={() => setPanelView("theme")}
               >
-                Theme
+                {t("theme")}
                 <i className="fa fa-chevron-right" aria-hidden="true" />
               </button>
               <button
@@ -171,7 +202,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 role="menuitem"
                 onClick={() => setPanelView("language")}
               >
-                Language
+                {t("language")}
                 <i className="fa fa-chevron-right" aria-hidden="true" />
               </button>
               <button
@@ -183,13 +214,13 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                   setReportOpen(true);
                 }}
               >
-                Report a problem
+                {t("reportProblem")}
               </button>
             </>
           ) : panelView === "theme" ? (
-            <ExtrasSubpanel title="Theme" onBack={() => setPanelView("menu")}>
+            <ExtrasSubpanel title={t("theme")} onBack={() => setPanelView("menu")}>
               <SegmentToggle
-                ariaLabel="Theme"
+                ariaLabel={t("themeAria")}
                 value={themeMode}
                 onChange={handleThemeChange}
                 options={[
@@ -201,21 +232,21 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                     value: "night",
                     label: <i className="fa fa-moon-o" aria-hidden="true" />,
                   },
-                  { value: "auto", label: "Auto", text: true },
+                  { value: "auto", label: t("auto"), text: true },
                 ]}
               />
             </ExtrasSubpanel>
           ) : (
-            <ExtrasSubpanel title="Language" onBack={() => setPanelView("menu")}>
+            <ExtrasSubpanel title={t("language")} onBack={() => setPanelView("menu")}>
               <SegmentToggle
-                ariaLabel="Language"
-                value={languageMode}
-                onChange={setLanguageMode}
-                options={[
-                  { value: "eng", label: "ENG", text: true },
-                  { value: "rus", label: "RUS", text: true },
-                  { value: "uzb", label: "UZB", text: true },
-                ]}
+                ariaLabel={t("languageAria")}
+                value={locale}
+                onChange={handleLanguageChange}
+                options={SUPPORTED_LANGUAGES.map((lang) => ({
+                  value: lang.code,
+                  label: lang.label,
+                  text: true,
+                }))}
               />
             </ExtrasSubpanel>
           )}

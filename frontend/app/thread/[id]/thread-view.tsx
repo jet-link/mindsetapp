@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
@@ -23,6 +24,7 @@ export default function ThreadView({
   id: number;
   focusReplyId?: number | null;
 }) {
+  const { t } = useTranslation("feed");
   const initialCache = getThreadCache(id);
   const initialTheme = initialCache?.theme ?? findThemeInAllCaches(id);
   const pathname = usePathname();
@@ -61,11 +63,11 @@ export default function ThreadView({
         setThreadCache(id, { theme: nextTheme, replies: nextReplies });
       }
     } catch {
-      setError("Thread not found or the API is unavailable.");
+      setError(t("threadNotFound"));
     } finally {
       setLoading(false);
     }
-  }, [id, focusReplyId]);
+  }, [id, focusReplyId, t]);
 
   useEffect(() => {
     if (focusReplyId) {
@@ -179,15 +181,15 @@ export default function ThreadView({
   if (loading && !theme) {
     return (
       <main>
-        <PageHeader title="Theme detail" />
-        <p className="muted page-status">Loading…</p>
+        <PageHeader title={t("themeDetail")} />
+        <p className="muted page-status">{t("common:loading")}</p>
       </main>
     );
   }
   if (error || !theme) {
     return (
       <main>
-        <PageHeader title="Theme detail" />
+        <PageHeader title={t("themeDetail")} />
         <p className="muted page-status">{error}</p>
       </main>
     );
@@ -195,7 +197,7 @@ export default function ThreadView({
 
   return (
     <main className="page-fade-in">
-      <PageHeader title="Theme detail" />
+      <PageHeader title={t("themeDetail")} />
       <ReplyForm themeId={theme.id} onPosted={load} />
       <div className="thread-chain">
         <ThemeCard
@@ -206,7 +208,7 @@ export default function ThreadView({
         />
         {replies.length > 0 && <ThreadRepliesLabel />}
         <div className="thread-replies">
-          {replies.length === 0 && <p className="muted">No replies yet.</p>}
+          {replies.length === 0 && <p className="muted">{t("noRepliesYet")}</p>}
           {replies.map((r, i) => (
             <ReplyCard
               key={r.id}

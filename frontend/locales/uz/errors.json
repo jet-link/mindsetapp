@@ -1,0 +1,16 @@
+{
+  "needLogin": "Tizimga kirishingiz kerak.",
+  "noPermission": "Bu amalni bajarishga ruxsatingiz yo'q.",
+  "serverError": "Server xatosi ({{status}}). Qayta urinib ko'ring.",
+  "networkError": "Tarmoq xatosi",
+  "unknownError": "Noma'lum xato",
+  "serverUnavailable": "Server mavjud emas",
+  "tooManyRequests": "Juda ko'p so'rovlar",
+  "wrongPassword": "Noto'g'ri parol",
+  "unsupportedFileType": "Qo'llab-quvvatlanmaydigan fayl turi.",
+  "image_one": "rasm",
+  "image_other": "rasm",
+  "kindTheme": "mavzu",
+  "kindReply": "javob",
+  "mediaLimitExceeded": "Siz ushbu {{kind}} uchun rasm chegarasidan oshib ketdingiz. {{count}} {{noun}} o'chiring."
+}

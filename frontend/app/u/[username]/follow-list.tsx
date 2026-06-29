@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Avatar from "@/components/Avatar";
 import ListExitWrap from "@/components/ListExitWrap";
 import {
@@ -32,6 +33,7 @@ function UserRow({
   onExitComplete?: () => void;
   onFollowingChange?: (username: string, following: boolean) => void;
 }) {
+  const { t } = useTranslation("profile");
   const [following, setFollowing] = useState(!!user.is_following);
   const [isOwn, setIsOwn] = useState<boolean | null>(null);
   const [authed, setAuthed] = useState(false);
@@ -84,7 +86,7 @@ function UserRow({
             className={`btn btn--sm ${following ? "" : "btn--ghost"}`}
             onClick={onToggle}
           >
-            {following ? "Unfollow" : "Follow"}
+            {following ? t("unfollow") : t("follow")}
           </button>
         )}
       </div>
@@ -99,6 +101,7 @@ export default function FollowList({
   username: string;
   kind: "followers" | "following";
 }) {
+  const { t } = useTranslation("profile");
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -237,7 +240,7 @@ export default function FollowList({
         setNextCursor(next);
       } catch (e) {
         if (requestId !== requestIdRef.current) return;
-        setError(e instanceof Error ? e.message : "Failed to load the list");
+        setError(e instanceof Error ? e.message : t("failedToLoadList"));
       } finally {
         if (requestId === requestIdRef.current) {
           setInitialLoading(false);
@@ -245,7 +248,7 @@ export default function FollowList({
         }
       }
     },
-    [username, kind],
+    [username, kind, t],
   );
 
   useEffect(() => {
@@ -299,35 +302,35 @@ export default function FollowList({
     <div>
       <div className="search-bar search-bar--compact" role="search">
         <label className="sr-only" htmlFor="follow-list-search">
-          Search users in list
+          {t("searchUsersInList")}
         </label>
         <i className="fa fa-search" aria-hidden="true" />
         <input
           id="follow-list-search"
           name="q"
           type="search"
-          placeholder="Search users…"
+          placeholder={t("searchUsers")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoComplete="off"
           spellCheck={false}
         />
         {fetching && (
-          <span className="search-bar__spinner" role="status" aria-label="Searching" />
+          <span className="search-bar__spinner" role="status" aria-label={t("search:searchingAria")} />
         )}
       </div>
 
       {initialLoading && users.length === 0 && (
-        <p className="muted page-status">Loading…</p>
+        <p className="muted page-status">{t("common:loading")}</p>
       )}
       {error && <p className="muted">{error}</p>}
       {showEmpty && (
         <p className="muted">
           {query.trim()
-            ? "No users match your search."
+            ? t("noUsersMatch")
             : kind === "followers"
-              ? "No followers yet."
-              : "Not following anyone yet."}
+              ? t("noFollowersYet")
+              : t("notFollowingAnyone")}
         </p>
       )}
 
@@ -349,7 +352,7 @@ export default function FollowList({
           {!fetching && (
             <p className="muted">
               <button type="button" className="link-btn" onClick={() => load("", nextCursor!)}>
-                Show more
+                {t("common:showMore")}
               </button>
             </p>
           )}

@@ -1,0 +1,12 @@
+{
+  "title": "Notifications",
+  "repliedToTheme": "replied to your theme",
+  "repostedTheme": "reposted your theme",
+  "readAll": "Read all",
+  "clearAll": "Clear notifications",
+  "noNotifications": "No notifications yet.",
+  "failedToLoad": "Failed to load notifications",
+  "failedToMarkRead": "Failed to mark as read",
+  "failedToClear": "Failed to clear notifications",
+  "view": "View"
+}

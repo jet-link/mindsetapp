@@ -1,0 +1,21 @@
+{
+  "copyThemeLink": "Скопировать ссылку на тему",
+  "copyReplyLink": "Скопировать ссылку на ответ",
+  "themeLinkCopied": "Ссылка на тему скопирована!",
+  "replyLinkCopied": "Ссылка на ответ скопирована!",
+  "delete": "Удалить",
+  "report": "Пожаловаться",
+  "reportTheme": "Пожаловаться на тему",
+  "reportReply": "Пожаловаться на ответ",
+  "reportReason": "Причина жалобы",
+  "otherReason": "Другая причина",
+  "otherPlaceholder": "Другое…",
+  "reasonSpam": "Спам",
+  "reasonBullying": "Травля или домогательства",
+  "reasonHate": "Разжигание ненависти",
+  "reasonMisinformation": "Дезинформация",
+  "reasonViolence": "Насилие или жестокий контент",
+  "reasonAdult": "Контент для взрослых",
+  "reasonScam": "Мошенничество или обман",
+  "reasonCopyright": "Нарушение авторских прав"
+}

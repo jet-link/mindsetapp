@@ -10,6 +10,7 @@ from apps.follows.models import Follow
 from apps.follows.services import FollowError, toggle_follow
 
 from .serializers import (
+    LanguageSerializer,
     MeSerializer,
     UserCardSerializer,
     UserProfileSerializer,
@@ -130,3 +131,17 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class MeLanguageView(APIView):
+    """PATCH /me/language/ — язык интерфейса (en/ru/uz)."""
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def patch(self, request):
+        serializer = LanguageSerializer(
+            request.user, data=request.data, partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'success': True, 'language': request.user.language})

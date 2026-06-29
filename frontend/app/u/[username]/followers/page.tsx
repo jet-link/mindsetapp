@@ -11,7 +11,7 @@ export default async function FollowersPage({
   const { username } = await params;
   return (
     <main>
-      <PageHeader title="Followers" />
+      <PageHeader titleKey="profile:followersTitle" />
       <FollowList username={username} kind="followers" />
     </main>
   );

@@ -286,6 +286,7 @@ a { color: inherit; text-decoration: none; }
 .sidenav__item.active {
   background: var(--surface);
   color: var(--text);
+  border: 1px solid var(--border);
 }
 .sidenav__item--disabled {
   color: var(--disabled-fg);
@@ -2754,4 +2755,30 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   /* .card { padding-left: 12px; padding-right: 12px; } */
   .composer { padding-left: var(--shell-pad-x); padding-right: var(--shell-pad-x); }
   /* .search-bar { margin-left: var(--shell-pad-x); margin-right: var(--shell-pad-x); } */
+}
+
+/* Полноэкранный прелоадер смены языка — показывается только если переключение
+   занимает заметное время (быстрые смены проходят без него). */
+.locale-switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--scrim);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.locale-switch-overlay .btn-spinner {
+  width: 26px;
+  height: 26px;
+  border-width: 3px;
+}
+.locale-switch-overlay__text {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 15px;
 }

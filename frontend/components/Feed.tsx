@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ThemeCard from "@/components/ThemeCard";
 import LoginCta from "@/components/LoginCta";
@@ -61,11 +62,6 @@ type TabSlice = {
   loaded: boolean;
 };
 
-const EMPTY_TEXT: Record<WallTab, string> = {
-  "for-you": "Nothing here yet. Be the first!",
-  following: "Follow people to see their themes here.",
-};
-
 function emptySlice(): TabSlice {
   return { themes: [], nextCursor: null, loaded: false };
 }
@@ -118,6 +114,7 @@ function initialWallTab(): WallTab {
 }
 
 export default function Feed() {
+  const { t } = useTranslation("feed");
   const router = useRouter();
   const pathname = usePathname();
   const initialTab = initialWallTab();
@@ -240,13 +237,13 @@ export default function Feed() {
       } catch (e) {
         if (tabRef.current === activeTab) {
           failedRef.current = { tab: activeTab, cursor };
-          setError(e instanceof Error ? e.message : "Failed to load the feed");
+          setError(e instanceof Error ? e.message : t("failedToLoad"));
         }
       } finally {
         setLoadingTab((current) => (current === activeTab ? null : current));
       }
     },
-    [applyPage],
+    [applyPage, t],
   );
 
   // Stale-while-revalidate: показав посты из дискового кэша, в фоне подтягиваем
@@ -631,17 +628,17 @@ export default function Feed() {
 
   return (
     <main>
-      <PageHeader title="Main wall" showBack={false} />
+      <PageHeader title={t("common:mainWall")} showBack={false} />
 
       {authed === true && (
         <AnimatedTabBar
           className="feed-tabs"
-          ariaLabel="Feed"
+          ariaLabel={t("feedAria")}
           activeId={tab}
           onSelect={switchTab}
           tabs={ALL_TABS.map((tabId) => ({
             id: tabId,
-            label: tabId === "for-you" ? "For you" : "Following",
+            label: tabId === "for-you" ? t("forYou") : t("following"),
           }))}
         />
       )}
@@ -677,12 +674,14 @@ export default function Feed() {
                       }
                     }}
                   >
-                    Retry
+                    {t("common:retry")}
                   </button>
                 </p>
               )}
               {isActive && !isLoading && !error && slice.themes.length === 0 && (
-                <p className="muted">{EMPTY_TEXT[tabId]}</p>
+                <p className="muted">
+                  {tabId === "for-you" ? t("emptyForYou") : t("emptyFollowing")}
+                </p>
               )}
 
               <VirtualizedFeedList
@@ -709,14 +708,14 @@ export default function Feed() {
               />
 
               {isActive && isLoading && slice.themes.length === 0 && (
-                <p className="muted">Loading…</p>
+                <p className="muted">{t("common:loading")}</p>
               )}
 
               {isActive && slice.nextCursor && (
                 <>
                   <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
                   {isLoading && slice.themes.length > 0 && (
-                    <p className="muted">Loading…</p>
+                    <p className="muted">{t("common:loading")}</p>
                   )}
                   {!isLoading && (
                     <p className="muted">
@@ -725,7 +724,7 @@ export default function Feed() {
                         className="link-btn"
                         onClick={() => loadMore(tabId, slice.nextCursor!)}
                       >
-                        Show more
+                        {t("common:showMore")}
                       </button>
                     </p>
                   )}

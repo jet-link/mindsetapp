@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { emitFollowChanged, getProfile, getStoredUsername, isLoggedIn, logout, toggleFollow, AUTH_EVENT } from "@/lib/api";
 
 export default function ProfileActions({
@@ -11,6 +12,7 @@ export default function ProfileActions({
   username: string;
   initialFollowing: boolean;
 }) {
+  const { t } = useTranslation("profile");
   const [following, setFollowing] = useState(initialFollowing);
   const [isOwn, setIsOwn] = useState<boolean | null>(null);
   const [authed, setAuthed] = useState(false);
@@ -77,15 +79,15 @@ export default function ProfileActions({
     <div className="profile-actions">
       {!isOwn && authed && (
         <button className={`btn btn--wide ${following ? "btn--ghost" : ""}`} onClick={onFollow}>
-          {following ? "Following" : "Follow"}
+          {following ? t("followingState") : t("follow")}
         </button>
       )}
       <button className="btn btn--ghost btn--wide" onClick={onMention}>
-        {copied ? "Copied!" : "Mention"}
+        {copied ? t("copied") : t("mention")}
       </button>
       {isOwn && (
         <button className="btn btn--ghost btn--wide" onClick={onLogout}>
-          Log out
+          {t("logout")}
         </button>
       )}
     </div>

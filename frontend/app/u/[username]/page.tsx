@@ -2,6 +2,7 @@ import ProfileHeader from "./profile-header";
 import ProfileActions from "./profile-actions";
 import ProfileHead from "./profile-head";
 import ProfileTabs from "./profile-tabs";
+import TranslatedMessage from "@/components/TranslatedMessage";
 import { getProfile } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function ProfilePage({
   try {
     profile = await getProfile(username);
   } catch {
-    return <p className="muted">User not found or the API is unavailable.</p>;
+    return <TranslatedMessage ns="profile" k="userNotFound" />;
   }
 
   return (

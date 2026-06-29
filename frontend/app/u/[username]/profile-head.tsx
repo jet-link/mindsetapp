@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import BioText, { bioCharCount } from "@/components/BioText";
 import Avatar from "@/components/Avatar";
 import ProfileStats from "./profile-stats";
@@ -29,6 +30,7 @@ export default function ProfileHead({
   followers: number;
   following: number;
 }) {
+  const { t } = useTranslation("profile");
   const [isOwn, setIsOwn] = useState(false);
   const [bio, setBio] = useState(initialBio);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatar);
@@ -65,7 +67,7 @@ export default function ProfileHead({
   async function saveBio(e?: React.FormEvent) {
     e?.preventDefault();
     if (bioCharCount(bioDraft) > BIO_LIMIT) {
-      setBioError(`Bio must be ${BIO_LIMIT} characters or fewer.`);
+      setBioError(t("bioTooLong", { count: BIO_LIMIT }));
       return;
     }
     setBioBusy(true);
@@ -76,7 +78,7 @@ export default function ProfileHead({
       emitUserProfileUpdated({ username, bio: me.bio });
       closeBioModal();
     } catch (err) {
-      setBioError(err instanceof Error ? err.message : "Failed to save bio");
+      setBioError(err instanceof Error ? err.message : t("failedToSaveBio"));
     } finally {
       setBioBusy(false);
     }
@@ -127,7 +129,7 @@ export default function ProfileHead({
   }
 
   const canInteract = avatarUrl || isOwn;
-  const bioTitle = bio ? "Edit bio" : "Add bio";
+  const bioTitle = bio ? t("editBio") : t("addBio");
   const bioOverLimit = bioCharCount(bioDraft) > BIO_LIMIT;
   const bioEmpty = !bioDraft.trim();
   const bioSubmitDisabled = bioBusy || bioOverLimit || (!bio && bioEmpty);
@@ -156,9 +158,9 @@ export default function ProfileHead({
             tabIndex={canInteract ? 0 : undefined}
             aria-label={
               avatarUrl
-                ? `View ${username}'s profile photo`
+                ? t("viewProfilePhoto", { username })
                 : isOwn
-                  ? "Add profile photo"
+                  ? t("addProfilePhoto")
                   : undefined
             }
           >
@@ -172,14 +174,14 @@ export default function ProfileHead({
               <BioText text={bio} />
               {isOwn && (
                 <button type="button" className="profile-edit-btn" onClick={openBioModal}>
-                  Edit bio
+                  {t("editBio")}
                 </button>
               )}
             </>
           ) : (
             isOwn && (
               <button type="button" className="profile-edit-btn" onClick={openBioModal}>
-                Add bio
+                {t("addBio")}
               </button>
             )
           )}
@@ -211,7 +213,7 @@ export default function ProfileHead({
             type="button"
             className="close-btn surface-form-lightbox__close"
             onClick={closeBioModal}
-            aria-label="Close"
+            aria-label={t("common:close")}
           >
             <i className="fa fa-times" aria-hidden="true" />
           </button>
@@ -224,14 +226,14 @@ export default function ProfileHead({
             <h2 className="surface-form-lightbox__title">{bioTitle}</h2>
             <form className="surface-form-card" onSubmit={saveBio} noValidate>
               <label className="sr-only" htmlFor="profile-bio-draft">
-                Bio
+                {t("bio")}
               </label>
               <textarea
                 id="profile-bio-draft"
                 value={bioDraft}
                 onChange={(e) => setBioDraft(e.target.value)}
-                placeholder="Tell people about yourself…"
-                aria-label="Bio"
+                placeholder={t("bioPlaceholder")}
+                aria-label={t("bio")}
                 rows={6}
               />
               {bioError && (
@@ -241,7 +243,7 @@ export default function ProfileHead({
               )}
               <div className="surface-form-card__footer">
                 <button type="submit" className="btn" disabled={bioSubmitDisabled}>
-                  {bio ? "Edit" : "Add"}
+                  {bio ? t("edit") : t("add")}
                 </button>
                 <span
                   className={
@@ -267,7 +269,7 @@ export default function ProfileHead({
             type="button"
             className="close-btn avatar-lightbox__close"
             onClick={() => setAvatarViewOpen(false)}
-            aria-label="Close"
+            aria-label={t("common:close")}
           >
             <i className="fa fa-times" aria-hidden="true" />
           </button>
@@ -281,7 +283,7 @@ export default function ProfileHead({
             <img
               className="avatar-lightbox__img"
               src={avatarUrl}
-              alt={`${username}'s profile photo`}
+              alt={t("profilePhotoAlt", { username })}
             />
             {isOwn && (
               <div className="avatar-lightbox__actions">
@@ -291,7 +293,7 @@ export default function ProfileHead({
                   onClick={onChangeAvatar}
                   disabled={avatarBusy}
                 >
-                  Change
+                  {t("change")}
                 </button>
                 <button
                   type="button"
@@ -299,7 +301,7 @@ export default function ProfileHead({
                   onClick={onDeleteAvatar}
                   disabled={avatarBusy}
                 >
-                  Remove
+                  {t("remove")}
                 </button>
               </div>
             )}

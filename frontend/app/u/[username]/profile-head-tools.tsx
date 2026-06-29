@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AUTH_EVENT, getStoredUsername, isLoggedIn } from "@/lib/api";
 
 export default function ProfileHeadTools({
@@ -8,6 +9,7 @@ export default function ProfileHeadTools({
 }: {
   username: string;
 }) {
+  const { t } = useTranslation("profile");
   const [menuOpen, setMenuOpen] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [showPlaneBtn, setShowPlaneBtn] = useState(false);
@@ -56,8 +58,8 @@ export default function ProfileHeadTools({
         <button
           type="button"
           className="card-menu__trigger"
-          aria-label="More actions"
-          title="More actions"
+          aria-label={t("common:moreActions")}
+          title={t("common:moreActions")}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
           onClick={() => setMenuOpen((v) => !v)}
@@ -77,7 +79,7 @@ export default function ProfileHeadTools({
               role="menuitem"
               onClick={copyProfileLink}
             >
-              Copy profile link
+              {t("copyProfileLink")}
             </button>
             {showBlockBtn && (
               <button
@@ -86,7 +88,7 @@ export default function ProfileHeadTools({
                 role="menuitem"
                 disabled
               >
-                Block
+                {t("block")}
               </button>
             )}
           </div>
@@ -97,8 +99,8 @@ export default function ProfileHeadTools({
         <button
           type="button"
           className="profile-head__tool-btn"
-          aria-label="Share profile"
-          title="Share profile"
+          aria-label={t("shareProfile")}
+          title={t("shareProfile")}
         >
           <i className="fa fa-plane-o" aria-hidden="true" />
         </button>
@@ -106,7 +108,7 @@ export default function ProfileHeadTools({
 
       {copiedToast && (
         <div className="copy-overlay" role="status">
-          <div className="copy-overlay__box">Profile link was copied!</div>
+          <div className="copy-overlay__box">{t("profileLinkCopied")}</div>
         </div>
       )}
     </div>

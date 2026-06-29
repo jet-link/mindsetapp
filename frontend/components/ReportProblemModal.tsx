@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { usePageScrollLock } from "@/lib/body-scroll-lock";
 import { THEME_BODY_LIMIT } from "@/lib/theme-body";
 
@@ -12,6 +13,7 @@ export default function ReportProblemModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("settings");
   const [body, setBody] = useState("");
   const [mounted, setMounted] = useState(false);
 
@@ -46,7 +48,7 @@ export default function ReportProblemModal({
         type="button"
         className="close-btn surface-form-lightbox__close"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t("common:close")}
       >
         <i className="fa fa-times" aria-hidden="true" />
       </button>
@@ -56,16 +58,16 @@ export default function ReportProblemModal({
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <h2 className="surface-form-lightbox__title">Report a problem</h2>
+        <h2 className="surface-form-lightbox__title">{t("reportProblem")}</h2>
         <form className="surface-form-card" onSubmit={submit} noValidate>
           <label className="sr-only" htmlFor="report-problem-body">
-            Problem description
+            {t("problemDescription")}
           </label>
           <textarea
             id="report-problem-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Provide as much detail as possible…"
+            placeholder={t("problemPlaceholder")}
             rows={6}
           />
           <div className="surface-form-card__footer">
@@ -75,14 +77,14 @@ export default function ReportProblemModal({
                 className="btn"
                 disabled={!body.trim() || overLimit}
               >
-                Send
+                {t("send")}
               </button>
               <button
                 type="button"
                 className="icon-btn"
                 disabled
-                title="Attach — coming soon"
-                aria-label="Attach file"
+                title={t("attachComingSoon")}
+                aria-label={t("attachFile")}
               >
                 <i className="fa fa-paperclip" aria-hidden="true" />
               </button>

@@ -1,0 +1,16 @@
+{
+  "theme": "Theme",
+  "language": "Language",
+  "reportProblem": "Report a problem",
+  "auto": "Auto",
+  "menu": "Menu",
+  "back": "Back",
+  "themeAria": "Theme",
+  "languageAria": "Language",
+  "problemDescription": "Problem description",
+  "problemPlaceholder": "Provide as much detail as possible…",
+  "send": "Send",
+  "attachFile": "Attach file",
+  "attachComingSoon": "Attach — coming soon",
+  "changingLanguage": "Changing language…"
+}

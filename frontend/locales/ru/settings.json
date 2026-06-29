@@ -1,0 +1,16 @@
+{
+  "theme": "Тема оформления",
+  "language": "Язык",
+  "reportProblem": "Сообщить о проблеме",
+  "auto": "Авто",
+  "menu": "Меню",
+  "back": "Назад",
+  "themeAria": "Тема оформления",
+  "languageAria": "Язык",
+  "problemDescription": "Описание проблемы",
+  "problemPlaceholder": "Опишите проблему как можно подробнее…",
+  "send": "Отправить",
+  "attachFile": "Прикрепить файл",
+  "attachComingSoon": "Прикрепление — скоро",
+  "changingLanguage": "Меняем язык…"
+}

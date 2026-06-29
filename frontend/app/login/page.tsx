@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import {
   LoginError,
   RegisterError,
@@ -16,11 +17,13 @@ type AuthErrorKind = "user_not_found" | "password_incorrect" | null;
 type RegisterField = keyof RegisterFieldErrors;
 
 export default function LoginPage() {
+  const { t } = useTranslation("auth");
   useEffect(() => {
-    setPageTitle("Log in");
+    setPageTitle(t("login"));
     // Из CTA-баннера гостя ведём сразу в режим регистрации (?mode=signup).
     const mode = new URLSearchParams(window.location.search).get("mode");
     if (mode === "signup" || mode === "register") setMode("register");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -142,22 +145,22 @@ export default function LoginPage() {
         setRegisterErrors(err.fields);
         setShowEmptyErrors(false);
       } else {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+        setError(err instanceof Error ? err.message : t("somethingWrong"));
       }
     }
   }
 
   return (
     <form className="form-page" onSubmit={submit} noValidate>
-      <h1>{mode === "login" ? "Log in" : "Sign up"}</h1>
+      <h1>{mode === "login" ? t("login") : t("signup")}</h1>
 
       <label className="sr-only" htmlFor="login-username">
-        Username
+        {t("username")}
       </label>
       <input
         id="login-username"
         name="username"
-        placeholder="Username"
+        placeholder={t("username")}
         value={username}
         onChange={(e) => onUsernameChange(e.target.value)}
         autoComplete="username"
@@ -168,12 +171,12 @@ export default function LoginPage() {
       {mode === "register" && (
         <>
           <label className="sr-only" htmlFor="login-email">
-            Email
+            {t("email")}
           </label>
           <input
             id="login-email"
             name="email"
-            placeholder="Email"
+            placeholder={t("email")}
             type="email"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
@@ -186,12 +189,12 @@ export default function LoginPage() {
 
       <div className={`password-field${passwordInvalid ? " password-field--error" : ""}`}>
         <label className="sr-only" htmlFor="login-password">
-          Password
+          {t("password")}
         </label>
         <input
           id="login-password"
           name="password"
-          placeholder="Password"
+          placeholder={t("password")}
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={(e) => onPasswordChange(e.target.value)}
@@ -203,8 +206,8 @@ export default function LoginPage() {
           type="button"
           className="password-field__toggle"
           onClick={() => setShowPassword((v) => !v)}
-          aria-label={showPassword ? "Hide password" : "Show password"}
-          title={showPassword ? "Hide password" : "Show password"}
+          aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+          title={showPassword ? t("hidePassword") : t("showPassword")}
         >
           <i className={`fa ${showPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
         </button>
@@ -212,7 +215,7 @@ export default function LoginPage() {
 
       {mode === "login" && (
         <p className="form-page__forgot">
-          <a href="#">Forgot the password?</a>
+          <a href="#">{t("forgotPassword")}</a>
         </p>
       )}
 
@@ -236,7 +239,7 @@ export default function LoginPage() {
       )}
 
       <button className="btn" type="submit" style={{ alignSelf: "stretch", textAlign: "center" }}>
-        {mode === "login" ? "Log in" : "Create account"}
+        {mode === "login" ? t("login") : t("createAccount")}
       </button>
       <button
         type="button"
@@ -244,20 +247,20 @@ export default function LoginPage() {
         style={{ alignSelf: "stretch", textAlign: "center" }}
         onClick={toggleMode}
       >
-        {mode === "login" ? "No account? Sign up" : "Already have an account? Log in"}
+        {mode === "login" ? t("noAccountSignup") : t("haveAccountLogin")}
       </button>
 
       <div className="auth-divider" aria-hidden="true">
-        <span>or</span>
+        <span>{t("or")}</span>
       </div>
 
       <button
         type="button"
         className="btn btn--ghost btn--google"
-        aria-label={mode === "login" ? "Log in with Google" : "Sign up with Google"}
+        aria-label={mode === "login" ? t("loginWithGoogle") : t("signupWithGoogle")}
       >
         <GoogleIcon />
-        {mode === "login" ? "Log in with Google" : "Sign up with Google"}
+        {mode === "login" ? t("loginWithGoogle") : t("signupWithGoogle")}
       </button>
     </form>
   );

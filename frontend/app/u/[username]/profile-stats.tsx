@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FOLLOW_EVENT, FollowChangedDetail, getProfile, getStoredUsername } from "@/lib/api";
+import { formatCompactNumber } from "@/lib/i18n";
 
 export default function ProfileStats({
   username,
@@ -13,6 +15,7 @@ export default function ProfileStats({
   followers: number;
   following: number;
 }) {
+  const { t } = useTranslation("profile");
   const [followersCount, setFollowersCount] = useState(followers);
   const [followingCount, setFollowingCount] = useState(following);
 
@@ -58,11 +61,11 @@ export default function ProfileStats({
   return (
     <div className="stats">
       <Link href={`/u/${username}/followers`} className="stat-link">
-        {followersCount} followers
+        {formatCompactNumber(followersCount)} {t("followers", { count: followersCount })}
       </Link>
       <span className="stat-sep"> · </span>
       <Link href={`/u/${username}/following`} className="stat-link">
-        {followingCount} following
+        {formatCompactNumber(followingCount)} {t("following")}
       </Link>
     </div>
   );

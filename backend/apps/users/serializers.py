@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import User
+from .models import Language, User
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -116,11 +116,11 @@ class MeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'id', 'username', 'email', 'avatar', 'bio',
+            'id', 'username', 'email', 'avatar', 'bio', 'language',
             'followers_count', 'following_count', 'themes_count',
         )
         read_only_fields = (
-            'id', 'username', 'email',
+            'id', 'username', 'email', 'language',
             'followers_count', 'following_count', 'themes_count',
         )
 
@@ -139,3 +139,13 @@ class MeSerializer(serializers.ModelSerializer):
             instance.avatar = None
             validated_data.pop('avatar')
         return super().update(instance, validated_data)
+
+
+class LanguageSerializer(serializers.ModelSerializer):
+    """PATCH /me/language/ — смена языка интерфейса."""
+
+    language = serializers.ChoiceField(choices=Language.choices)
+
+    class Meta:
+        model = User
+        fields = ('language',)

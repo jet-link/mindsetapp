@@ -1,0 +1,20 @@
+{
+  "title": "Поиск",
+  "themesAndHashtags": "Темы и хэштеги",
+  "users": "Пользователи",
+  "searchType": "Тип поиска",
+  "themesPlaceholder": "Поиск тем или #хэштегов…",
+  "usersPlaceholder": "Поиск пользователей или @username…",
+  "themesLabel": "Поиск тем или хэштегов",
+  "usersLabel": "Поиск пользователей или @username",
+  "recentSearches": "Недавние запросы",
+  "clearHistory": "Очистить историю",
+  "noRecentSearches": "Нет недавних запросов!",
+  "removeFromHistory": "Удалить «{{query}}» из истории",
+  "typeAtLeast": "Введите хотя бы {{count}} символа для поиска.",
+  "searchFailed": "Ошибка поиска",
+  "noThemesFound": "Темы не найдены.",
+  "noUsersFound": "Пользователи не найдены.",
+  "searchingAria": "Поиск",
+  "noPostsWithTag": "С этим тегом пока нет публикаций."
+}

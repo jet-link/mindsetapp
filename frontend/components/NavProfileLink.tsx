@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Avatar from "@/components/Avatar";
 import {
   AUTH_EVENT,
@@ -28,6 +29,7 @@ export default function NavProfileLink({
   onPointerDown,
   onClick,
 }: NavProfileLinkProps) {
+  const { t } = useTranslation("common");
   const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,8 +82,8 @@ export default function NavProfileLink({
       href={href}
       prefetch={false}
       className={`${className}${active ? " active" : ""}`}
-      title="Profile"
-      aria-label="Profile"
+      title={t("profile")}
+      aria-label={t("profile")}
       aria-current={active ? "page" : undefined}
       onPointerDown={onPointerDown}
       onClick={onClick}

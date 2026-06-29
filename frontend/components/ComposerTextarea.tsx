@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
   type SyntheticEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import Avatar from "@/components/Avatar";
 import { UserPublic, searchMentionUsers } from "@/lib/api";
 
@@ -29,6 +30,7 @@ export default function ComposerTextarea({
   placeholder?: string;
   "aria-label"?: string;
 }) {
+  const { t } = useTranslation("feed");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,12 +160,12 @@ export default function ComposerTextarea({
       />
       {open && (
         <ul id={listId} className="mention-suggest" role="listbox">
-          {!query && <li className="mention-suggest__status">Type a username…</li>}
+          {!query && <li className="mention-suggest__status">{t("typeUsername")}</li>}
           {query && loading && results.length === 0 && (
-            <li className="mention-suggest__status">Searching…</li>
+            <li className="mention-suggest__status">{t("searching")}</li>
           )}
           {query && !loading && results.length === 0 && (
-            <li className="mention-suggest__status">No users found</li>
+            <li className="mention-suggest__status">{t("noUsersFound")}</li>
           )}
           {results.map((user, i) => (
             <li key={user.id} role="option" aria-selected={i === activeIndex}>

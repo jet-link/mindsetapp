@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { usePageScrollLock } from "@/lib/body-scroll-lock";
 
 export default function Modal({
@@ -18,6 +19,7 @@ export default function Modal({
   ariaLabel: string;
   overlayVariant?: "default" | "lightbox";
 }) {
+  const { t } = useTranslation("common");
   usePageScrollLock(open);
 
   if (!open) return null;
@@ -36,7 +38,7 @@ export default function Modal({
           type="button"
           className="close-btn modal__close"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("close")}
         >
           <i className="fa fa-times" aria-hidden="true" />
         </button>

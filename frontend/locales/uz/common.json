@@ -1,0 +1,23 @@
+{
+  "mainWall": "Asosiy",
+  "search": "Qidiruv",
+  "createTheme": "Mavzu yaratish",
+  "notifications": "Bildirishnomalar",
+  "profile": "Profil",
+  "menu": "Menyu",
+  "mainNavigation": "Asosiy navigatsiya",
+  "back": "Orqaga",
+  "goBack": "Orqaga qaytish",
+  "close": "Yopish",
+  "loading": "Yuklanmoqda…",
+  "loadingMore": "Yuklanmoqda…",
+  "showMore": "Ko'proq ko'rsatish",
+  "retry": "Qayta urinish",
+  "moreActions": "Boshqa amallar",
+  "send": "Yuborish",
+  "newTheme": "Yangi mavzu",
+  "themeDetail": "Mavzu",
+  "replyDetail": "Javob",
+  "unreadNotifications_one": "{{count}} ta o'qilmagan bildirishnoma",
+  "unreadNotifications_other": "{{count}} ta o'qilmagan bildirishnoma"
+}

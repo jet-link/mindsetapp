@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ComposerTextarea from "@/components/ComposerTextarea";
 import {
   MediaAttachButton,
   MediaPreviews,
   useMediaPicker,
 } from "@/components/MediaPickerField";
-import { Theme, createTheme, emitThemeCreated, isLoggedIn } from "@/lib/api";
+import { CooldownError, Theme, createTheme, emitThemeCreated, isLoggedIn } from "@/lib/api";
 import { THEME_COOLDOWN_SECONDS } from "@/lib/cooldown-storage";
-import { parseCooldownSeconds, useCooldown } from "@/lib/use-cooldown";
+import { useCooldown } from "@/lib/use-cooldown";
 import { mediaLimitExceededMessage } from "@/lib/media-limit";
 import {
   THEME_BODY_LIMIT,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/theme-body";
 
 export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => void }) {
+  const { t } = useTranslation("feed");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
     return (
       <div className="composer composer--login">
         <Link href="/login" className="login-hint">
-          Log in to post
+          {t("auth:loginToPost")}
         </Link>
       </div>
     );
@@ -70,13 +72,11 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
       emitThemeCreated(theme);
       onPosted?.(theme);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to publish";
-      const secs = parseCooldownSeconds(message);
-      if (secs) {
-        cooldown.start(secs);
+      if (err instanceof CooldownError) {
+        cooldown.start(err.retryAfter || THEME_COOLDOWN_SECONDS);
         setError("");
       } else {
-        setError(message);
+        setError(err instanceof Error ? err.message : t("failedToPublish"));
       }
     } finally {
       setBusy(false);
@@ -86,14 +86,14 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
   return (
     <form className="composer" onSubmit={submit} noValidate>
       <label className="sr-only" htmlFor="compose-body">
-        New theme
+        {t("newThemeLabel")}
       </label>
       <ComposerTextarea
         id="compose-body"
-        placeholder="What's new? #hashtags, @mentions and links are supported"
+        placeholder={t("composerPlaceholder")}
         value={body}
         onChange={handleBodyChange}
-        aria-label="New theme"
+        aria-label={t("newThemeLabel")}
       />
       <div className="composer-footer">
         <div className="composer-actions">
@@ -105,14 +105,14 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
             {busy ? (
               <span className="btn-spinner" aria-hidden="true" />
             ) : (
-              "Post"
+              t("post")
             )}
           </button>
           <MediaAttachButton picker={picker} disabled={busy} />
         </div>
         <div className="composer-meta">
           {cooldown.active ? (
-            <span className="bio-counter">You can post again in {cooldown.seconds}s</span>
+            <span className="bio-counter">{t("canPostAgain", { seconds: cooldown.seconds })}</span>
           ) : (
             <span className={overLimit ? "bio-counter bio-counter--over" : "bio-counter"}>
               {chars}/{THEME_BODY_LIMIT}
@@ -123,7 +123,7 @@ export default function Composer({ onPosted }: { onPosted?: (theme?: Theme) => v
       <MediaPreviews picker={picker} />
       {busy && picker.files.length > 0 && (
         <div className="composer-uploading" role="status">
-          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> Publishing media…
+          <span className="btn-spinner btn-spinner--dark" aria-hidden="true" /> {t("publishingMedia")}
         </div>
       )}
       {error && (

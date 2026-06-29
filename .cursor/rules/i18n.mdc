@@ -1,0 +1,42 @@
+---
+description: i18n conventions for the Mindset app (en/ru/uz, no hardcoded UI text)
+globs: frontend/**/*.tsx,frontend/**/*.ts,frontend/locales/**/*.json
+alwaysApply: false
+---
+
+# Internationalization (i18n)
+
+The app ships in English (default + fallback), Russian and Uzbek (`en`/`ru`/`uz`).
+Every user-facing string must go through `i18next`.
+
+## Rules
+
+- Никакого хардкода UI-текста. Любая видимая строка (текст, `placeholder`, `aria-label`,
+  `title`, `alt` смысловой) — через `t('namespace:key')`.
+- Сначала добавляем ключ в `frontend/locales/en/<namespace>.json`, затем в `ru` и `uz`.
+  Ключ обязан существовать во всех трёх языках.
+- Namespace = функциональный модуль: `common`, `auth`, `feed`, `profile`, `search`,
+  `notifications`, `settings`, `messages`, `moderation`, `errors`, `dates`.
+- Ключи фиксированные. **Никогда** `t(userInput)`.
+- Пользовательский контент (посты, ответы, bio, username) не переводится.
+- Множественное число — суффиксы i18next (`key_one`/`key_few`/`key_many`/`key_other`),
+  переменные — `{{name}}`.
+- Даты и числа форматируем на клиенте через `frontend/lib/i18n`
+  (`formatRelativeTime`, `formatCompactNumber`, `formatDateTime`), а не на сервере.
+
+## Examples
+
+```tsx
+// ❌ BAD
+<button aria-label="Close">Send</button>
+
+// ✅ GOOD
+const { t } = useTranslation("feed");
+<button aria-label={t("common:close")}>{t("post")}</button>
+```
+
+Для server-компонентов, где нельзя вызвать хук, используйте клиентскую обёртку
+`TranslatedMessage` или `PageHeader` с пропом `titleKey`.
+
+Бэкенд: сообщения об ошибках/системные строки переводятся через `t(key, lang)`
+(`backend/apps/core/i18n`), язык берётся из `Accept-Language`.

@@ -1,0 +1,16 @@
+{
+  "needLogin": "You need to log in.",
+  "noPermission": "You don't have permission to do that.",
+  "serverError": "Server error ({{status}}). Please try again.",
+  "networkError": "Network error",
+  "unknownError": "Unknown error",
+  "serverUnavailable": "Server unavailable",
+  "tooManyRequests": "Too many requests",
+  "wrongPassword": "Wrong password",
+  "unsupportedFileType": "Unsupported file type.",
+  "image_one": "image",
+  "image_other": "images",
+  "kindTheme": "theme",
+  "kindReply": "reply",
+  "mediaLimitExceeded": "You have exceeded the image limit for this {{kind}}. Please remove {{count}} {{noun}}."
+}

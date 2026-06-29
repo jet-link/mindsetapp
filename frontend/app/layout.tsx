@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import BottomNav from "@/components/BottomNav";
+import I18nProvider from "@/components/I18nProvider";
 import MentionHoverLayer from "@/components/MentionHoverLayer";
 import MobileHeader from "@/components/MobileHeader";
 import RouteTitle from "@/components/RouteTitle";
@@ -24,19 +25,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var m=localStorage.getItem("mindset-theme");if(m!=="sun"&&m!=="night"&&m!=="auto")m="sun";var d=m==="night"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var t=d?"dark":"light";var e=document.documentElement;e.setAttribute("data-theme",t);e.style.colorScheme=t;}catch(e){}})();`,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var l=localStorage.getItem("mindset-locale");if(l!=="en"&&l!=="ru"&&l!=="uz")l="en";var e=document.documentElement;e.setAttribute("lang",l);e.setAttribute("dir","ltr");}catch(e){}})();`,
+          }}
+        />
         <link
           rel="stylesheet"
           href="/vendor/font-awesome/css/font-awesome.min.css"
         />
       </head>
       <body suppressHydrationWarning>
-        <ServiceWorkerCleanup />
-        <RouteTitle />
-        <MobileHeader />
-        <SideNav />
-        <div className="shell">{children}</div>
-        <MentionHoverLayer />
-        <BottomNav />
+        <I18nProvider>
+          <ServiceWorkerCleanup />
+          <RouteTitle />
+          <MobileHeader />
+          <SideNav />
+          <div className="shell">{children}</div>
+          <MentionHoverLayer />
+          <BottomNav />
+        </I18nProvider>
       </body>
     </html>
   );

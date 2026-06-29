@@ -1,0 +1,16 @@
+{
+  "theme": "Mavzu (ko'rinish)",
+  "language": "Til",
+  "reportProblem": "Muammo haqida xabar berish",
+  "auto": "Avto",
+  "menu": "Menyu",
+  "back": "Orqaga",
+  "themeAria": "Mavzu (ko'rinish)",
+  "languageAria": "Til",
+  "problemDescription": "Muammo tavsifi",
+  "problemPlaceholder": "Muammoni iloji boricha batafsil yozing…",
+  "send": "Yuborish",
+  "attachFile": "Fayl biriktirish",
+  "attachComingSoon": "Biriktirish — tez orada",
+  "changingLanguage": "Til o'zgartirilmoqda…"
+}

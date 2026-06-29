@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import type { MediaItem } from "@/lib/api";
 import { isGifMedia } from "@/lib/media-types";
 import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
@@ -17,6 +18,7 @@ export default function ProfileMediaGrid({
   enter?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useTranslation("profile");
 
   if (items.length === 0) return null;
 
@@ -48,7 +50,7 @@ export default function ProfileMediaGrid({
           className="media-grid__item"
           data-anchor-media={m.id}
           onClick={(e) => openSource(m, e.currentTarget)}
-          aria-label="Open post"
+          aria-label={t("openPost")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

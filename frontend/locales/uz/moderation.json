@@ -1,0 +1,21 @@
+{
+  "copyThemeLink": "Mavzu havolasini nusxalash",
+  "copyReplyLink": "Javob havolasini nusxalash",
+  "themeLinkCopied": "Mavzu havolasi nusxalandi!",
+  "replyLinkCopied": "Javob havolasi nusxalandi!",
+  "delete": "O'chirish",
+  "report": "Shikoyat qilish",
+  "reportTheme": "Mavzu haqida shikoyat qilish",
+  "reportReply": "Javob haqida shikoyat qilish",
+  "reportReason": "Shikoyat sababi",
+  "otherReason": "Boshqa sabab",
+  "otherPlaceholder": "Boshqa…",
+  "reasonSpam": "Spam",
+  "reasonBullying": "Bezorilik yoki ta'qib",
+  "reasonHate": "Nafrat tilga olish",
+  "reasonMisinformation": "Noto'g'ri ma'lumot",
+  "reasonViolence": "Zo'ravonlik yoki shafqatsiz kontent",
+  "reasonAdult": "Kattalar uchun kontent",
+  "reasonScam": "Firibgarlik yoki aldov",
+  "reasonCopyright": "Mualliflik huquqi buzilishi"
+}

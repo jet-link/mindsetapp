@@ -1,0 +1,20 @@
+{
+  "title": "Search",
+  "themesAndHashtags": "Themes & hashtags",
+  "users": "Users",
+  "searchType": "Search type",
+  "themesPlaceholder": "Search themes or #hashtags…",
+  "usersPlaceholder": "Search users or @username…",
+  "themesLabel": "Search themes or hashtags",
+  "usersLabel": "Search users or @username",
+  "recentSearches": "Recent searches",
+  "clearHistory": "Clear history",
+  "noRecentSearches": "No recent searches!",
+  "removeFromHistory": "Remove \"{{query}}\" from history",
+  "typeAtLeast": "Type at least {{count}} characters to search.",
+  "searchFailed": "Search failed",
+  "noThemesFound": "No themes found.",
+  "noUsersFound": "No users found.",
+  "searchingAria": "Searching",
+  "noPostsWithTag": "No posts with this tag yet."
+}

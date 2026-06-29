@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import Composer from "@/components/Composer";
 import ThemeCard from "@/components/ThemeCard";
@@ -12,6 +13,7 @@ const RECENT_THEMES_LIMIT = 10;
 
 export default function ComposePage() {
   const router = useRouter();
+  const { t } = useTranslation("feed");
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [recent, setRecent] = useState<Theme[]>([]);
@@ -53,18 +55,18 @@ export default function ComposePage() {
 
   return (
     <main>
-      <PageHeader title="New theme" showBack={false} />
+      <PageHeader title={t("newThemeLabel")} showBack={false} />
       <Composer onPosted={onPosted} />
 
       {loaded && recent.length === 0 && (
-        <p className="section-title muted">You haven&apos;t published any theme yet</p>
+        <p className="section-title muted">{t("noThemesPublished")}</p>
       )}
 
       {recent.length > 0 && (
         <>
-          <h2 className="section-title">Your last themes</h2>
-          {recent.map((t) => (
-            <ThemeCard key={t.id} theme={t} />
+          <h2 className="section-title">{t("yourLastThemes")}</h2>
+          {recent.map((theme) => (
+            <ThemeCard key={theme.id} theme={theme} />
           ))}
         </>
       )}

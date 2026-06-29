@@ -75,10 +75,23 @@ export function updateThemeRepostInProfileCache(
   reposted: boolean,
   repostsCount: number,
 ) {
+  const isOwnProfile =
+    !!profileTabsCache && profileTabsCache.username === getStoredUsername();
   mapCachedSlices((slice, tab) => {
     if (tab === "reposts" && !reposted) {
-      // Карточку уберём после exit-анимации на открытой вкладке Reposts.
-      return slice;
+      // Анти-репост на своём профиле: сразу убираем карточку из кэша вкладки
+      // Reposts. Иначе, если анти-репост сделан из детального просмотра (страница
+      // профиля размонтирована, exit-анимации нет), элемент «воскресал» при
+      // возврате по back из устаревшего кэша. Если вкладка открыта — видимое
+      // удаление с анимацией делает сам компонент по событию.
+      // На чужом профиле список репостов принадлежит владельцу — не трогаем.
+      if (!isOwnProfile) return slice;
+      return {
+        ...slice,
+        reposts: slice.reposts.filter(
+          (r) => !(r.kind === "theme" && r.theme?.id === themeId),
+        ),
+      };
     }
     return {
       ...slice,
@@ -154,10 +167,19 @@ export function updateReplyRepostInProfileCache(
   reposted: boolean,
   repostsCount: number,
 ) {
+  const isOwnProfile =
+    !!profileTabsCache && profileTabsCache.username === getStoredUsername();
   mapCachedSlices((slice, tab) => {
     if (tab === "reposts" && !reposted) {
-      // Карточку уберём после exit-анимации на открытой вкладке Reposts.
-      return slice;
+      // Анти-репост на своём профиле: сразу убираем карточку из кэша вкладки
+      // Reposts (см. подробный комментарий в updateThemeRepostInProfileCache).
+      if (!isOwnProfile) return slice;
+      return {
+        ...slice,
+        reposts: slice.reposts.filter(
+          (r) => !(r.kind === "reply" && r.reply?.id === replyId),
+        ),
+      };
     }
     return {
       ...slice,

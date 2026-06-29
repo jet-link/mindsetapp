@@ -1486,7 +1486,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .profile-info { flex: 1; min-width: 0; }
 .profile-head h1 { margin: 0; font-size: 26px; line-height: 1.2; }
 .profile-handle {
-  margin: 0;
+  margin: 7px 0;
   font-size: 14px;
   line-height: 1.2;
   color: var(--text-dim);

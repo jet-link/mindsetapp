@@ -89,7 +89,14 @@ export function initI18n(
       // Пользователю при этом всё равно показывается английский (fallback).
       console.warn(`Missing translation:\n${ns}.${key}\nLanguage: ${lang}`);
     },
-    react: { useSuspense: false },
+    react: {
+      useSuspense: false,
+      // Перерисовываем компоненты не только при смене языка, но и когда
+      // ресурсы языка догрузились/изменились — иначе уже смонтированные
+      // (sidenav, текущая страница) могли застрять на дефолтном языке.
+      bindI18n: "languageChanged loaded",
+      bindI18nStore: "added removed",
+    },
   });
 
   return i18n;
@@ -105,26 +112,52 @@ async function importNamespace(
   return (mod.default ?? mod) as Record<string, string>;
 }
 
+// Кэш загрузок «в полёте»: параллельные запросы одного языка ждут один промис,
+// чтобы не было гонок и двойной регистрации словарей.
+const inFlight = new Map<Locale, Promise<void>>();
+
 /** Загружает все словари языка (если ещё не загружены) и регистрирует их. */
 export async function loadLocaleResources(locale: Locale): Promise<void> {
   if (locale === DEFAULT_LOCALE) return; // en уже в бандле
   if (i18n.hasResourceBundle(locale, "common")) return; // уже загружен
 
-  const bundles = await Promise.all(
-    NAMESPACES.map((ns) => importNamespace(locale, ns)),
-  );
-  NAMESPACES.forEach((ns, i) => {
-    i18n.addResourceBundle(locale, ns, bundles[i], true, true);
-  });
+  const pending = inFlight.get(locale);
+  if (pending) return pending;
+
+  const task = (async () => {
+    const bundles = await Promise.all(
+      NAMESPACES.map((ns) => importNamespace(locale, ns)),
+    );
+    NAMESPACES.forEach((ns, i) => {
+      i18n.addResourceBundle(locale, ns, bundles[i], true, true);
+    });
+  })();
+
+  inFlight.set(locale, task);
+  try {
+    await task;
+  } finally {
+    inFlight.delete(locale);
+  }
 }
 
 /**
  * Освобождает словари языков, которые сейчас не используются (кроме en —
  * он нужен как fallback). Снижает потребление памяти при частых переключениях.
+ *
+ * Защита: никогда не выгружаем словарь активного языка i18next — иначе при
+ * гонке переключений активный язык остался бы без переводов (всё падало бы на en).
  */
 export function freeUnusedLocales(activeLocale: Locale): void {
+  const current = (i18n.language || DEFAULT_LOCALE).split("-")[0];
   for (const locale of SUPPORTED_LOCALES) {
-    if (locale === DEFAULT_LOCALE || locale === activeLocale) continue;
+    if (
+      locale === DEFAULT_LOCALE ||
+      locale === activeLocale ||
+      locale === current
+    ) {
+      continue;
+    }
     if (!i18n.hasResourceBundle(locale, "common")) continue;
     for (const ns of NAMESPACES) {
       i18n.removeResourceBundle(locale, ns);

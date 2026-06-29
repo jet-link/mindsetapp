@@ -82,11 +82,14 @@ export default function I18nProvider({
         if (cancelled) return;
         const serverLocale = isLocale(me.language) ? me.language : null;
         if (!serverLocale) return;
-        if (stored !== DEFAULT_LOCALE && serverLocale !== stored) {
-          // Гость осознанно выбрал язык до входа — переносим выбор на сервер.
-          updateMeLanguage(stored).catch(() => {});
-        } else if (stored === DEFAULT_LOCALE && serverLocale !== stored) {
-          // Локально язык не выбирали — берём язык из профиля (сервер главнее).
+        // Перечитываем выбор СВЕЖИМ: пользователь мог переключить язык, пока
+        // грузился профиль. В этом случае его выбор главнее ответа сервера —
+        // иначе поздний getMe откатил бы язык обратно.
+        const freshStored = getStoredLocale();
+        if (freshStored !== DEFAULT_LOCALE) {
+          if (serverLocale !== freshStored) updateMeLanguage(freshStored).catch(() => {});
+        } else if (serverLocale !== getActiveLocale()) {
+          // Локального выбора не было — берём язык из профиля (сервер главнее).
           await switchLocale(serverLocale);
         }
       } catch {

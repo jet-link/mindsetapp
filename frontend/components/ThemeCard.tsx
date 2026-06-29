@@ -25,7 +25,7 @@ import {
   toggleRepost,
 } from "@/lib/api";
 import { bouncePress } from "@/lib/nav-bounce";
-import { saveReturnAnchor } from "@/lib/return-anchor";
+import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
 import { seedThreadTheme } from "@/lib/detail-cache";
 
 
@@ -62,6 +62,7 @@ export default function ThemeCard({
   const [replies, setReplies] = useState(theme.replies_count);
   const [exiting, setExiting] = useState(false);
   const deletePending = useRef(false);
+  const cardRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setReplies(theme.replies_count);
@@ -192,7 +193,10 @@ export default function ThemeCard({
   }
 
   function openThread() {
-    saveReturnAnchor({ kind: "theme", id: theme.id });
+    const el = cardRef.current;
+    if (el) {
+      saveReturnAnchorFromElement(el, { kind: "theme", id: theme.id });
+    }
     seedThreadTheme(theme);
     onOpen?.();
     router.push(`/thread/${theme.id}`);
@@ -224,7 +228,7 @@ export default function ThemeCard({
             }
       }
     >
-      <article className="card" data-anchor-theme={theme.id}>
+      <article ref={cardRef} className="card" data-anchor-theme={theme.id}>
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >

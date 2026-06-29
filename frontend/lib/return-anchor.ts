@@ -7,6 +7,8 @@ export interface ReturnAnchor {
   savedAt: number;
   /** Позиция верха карточки в окне в момент ухода — для пиксель-точного возврата. */
   viewportTop?: number;
+  /** Целевой scrollTop на случай, если карточка исчезла из DOM (unrepost, delete). */
+  fallbackScrollY?: number;
 }
 
 const ANCHOR_TTL_MS = 5 * 60_000;
@@ -70,6 +72,7 @@ export function saveReturnAnchor(anchor: {
   kind: AnchorKind;
   id: number;
   viewportTop?: number;
+  fallbackScrollY?: number;
 }) {
   const listKey = anchor.listKey ?? currentListKey;
   anchors.set(listKey, {
@@ -78,7 +81,21 @@ export function saveReturnAnchor(anchor: {
     id: anchor.id,
     savedAt: Date.now(),
     viewportTop: anchor.viewportTop,
+    fallbackScrollY: anchor.fallbackScrollY,
   });
+}
+
+/** Сохраняет якорь по DOM-элементу карточки — с fallback scrollY на случай удаления. */
+export function saveReturnAnchorFromElement(
+  el: HTMLElement,
+  anchor: { listKey?: string; kind: AnchorKind; id: number },
+) {
+  const rect = el.getBoundingClientRect();
+  const viewportTop = rect.top;
+  const absTop = rect.top + window.scrollY;
+  const inset = topInset();
+  const fallbackScrollY = Math.max(0, absTop - Math.max(viewportTop, inset + 4));
+  saveReturnAnchor({ ...anchor, viewportTop, fallbackScrollY });
 }
 
 export function clearReturnAnchor(listKey: string) {
@@ -114,14 +131,20 @@ function topInset(): number {
  */
 export function computeAnchorTop(anchor: ReturnAnchor): number | null {
   const el = findAnchorElement(anchor.kind, anchor.id);
-  if (!el) return null;
-  const rect = el.getBoundingClientRect();
-  const absTop = rect.top + window.scrollY;
-  const top =
-    typeof anchor.viewportTop === "number"
-      ? absTop - Math.max(anchor.viewportTop, topInset() + 4)
-      : absTop - (window.innerHeight - rect.height) / 2;
-  return Math.max(0, top);
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    const absTop = rect.top + window.scrollY;
+    const top =
+      typeof anchor.viewportTop === "number"
+        ? absTop - Math.max(anchor.viewportTop, topInset() + 4)
+        : absTop - (window.innerHeight - rect.height) / 2;
+    return Math.max(0, top);
+  }
+  // Карточка удалена (unrepost, delete) — восстанавливаем ту же область прокрутки.
+  if (typeof anchor.fallbackScrollY === "number") {
+    return Math.max(0, anchor.fallbackScrollY);
+  }
+  return null;
 }
 
 /** Мгновенно (без smooth-scroll) возвращает к карточке. */

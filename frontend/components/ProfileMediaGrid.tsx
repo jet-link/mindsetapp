@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { MediaItem } from "@/lib/api";
 import { isGifMedia } from "@/lib/media-types";
-import { saveReturnAnchor } from "@/lib/return-anchor";
+import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
 
 /** Сетка медиа профиля: клик ведёт к теме или ответу-источнику. */
 export default function ProfileMediaGrid({
@@ -23,12 +23,10 @@ export default function ProfileMediaGrid({
   const listKey = `/u/${username}?tab=media`;
 
   function openSource(m: MediaItem, el: HTMLElement) {
-    // Якорь на саму медиакарточку + её позиция на экране — для пиксель-точного возврата.
-    saveReturnAnchor({
+    saveReturnAnchorFromElement(el, {
       listKey,
       kind: "media",
       id: m.id,
-      viewportTop: el.getBoundingClientRect().top,
     });
     if (m.reply_id) {
       router.push(`/reply/${m.reply_id}`);

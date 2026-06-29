@@ -26,7 +26,7 @@ import {
   toggleReplyRepost,
 } from "@/lib/api";
 import { bouncePress } from "@/lib/nav-bounce";
-import { saveReturnAnchor } from "@/lib/return-anchor";
+import { saveReturnAnchorFromElement } from "@/lib/return-anchor";
 import { seedReplyDetailReply } from "@/lib/detail-cache";
 
 export default function ReplyCard({
@@ -66,6 +66,14 @@ export default function ReplyCard({
   const [replies, setReplies] = useState(reply.replies_count);
   const [exiting, setExiting] = useState(false);
   const deletePending = useRef<ReplyDeletedDetail | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+
+  function saveReplyAnchor() {
+    const el = cardRef.current;
+    if (el) {
+      saveReturnAnchorFromElement(el, { kind: "reply", id: reply.id });
+    }
+  }
 
   useEffect(() => {
     setReplies(reply.replies_count);
@@ -198,7 +206,7 @@ export default function ReplyCard({
   }
 
   function openReplyThread() {
-    saveReturnAnchor({ kind: "reply", id: reply.id });
+    saveReplyAnchor();
     seedReplyDetailReply(reply);
     router.push(`/reply/${reply.id}`);
   }
@@ -208,7 +216,7 @@ export default function ReplyCard({
   function onBadgeNavigate(e: MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     e.stopPropagation();
-    saveReturnAnchor({ kind: "reply", id: reply.id });
+    saveReplyAnchor();
     if (reply.parent_id != null) {
       router.push(`/reply/${reply.parent_id}`);
     } else {
@@ -242,7 +250,11 @@ export default function ReplyCard({
             }
       }
     >
-      <article className={`card${indented ? " card--reply" : ""}`} data-anchor-reply={reply.id}>
+      <article
+        ref={cardRef}
+        className={`card${indented ? " card--reply" : ""}`}
+        data-anchor-reply={reply.id}
+      >
       <div
         className={`card-avatar-col${threadLineBelow ? " card-avatar-col--line" : ""}`}
       >

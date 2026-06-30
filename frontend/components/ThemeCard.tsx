@@ -290,7 +290,11 @@ export default function ThemeCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onLike}
           >
-            <i className={`fa ${liked ? "fa-heart" : "fa-heart-o"}`} aria-hidden="true" />{" "}
+            <i
+              key={liked ? "liked" : "unliked"}
+              className={liked ? "fa-solid fa-heart" : "fa-regular fa-heart"}
+              aria-hidden="true"
+            />{" "}
             {formatCompactNumber(likes)}
           </button>
           <button
@@ -298,7 +302,7 @@ export default function ThemeCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onReply}
           >
-            <i className="fa fa-comment" aria-hidden="true" />{" "}
+            <i className="fa-regular fa-comment" aria-hidden="true" />{" "}
             {formatCompactNumber(replies)}
           </button>
           <button
@@ -307,10 +311,10 @@ export default function ThemeCard({
             onPointerDown={(e) => bouncePress(e.currentTarget)}
             onClick={onRepost}
           >
-            <i className="fa fa-refresh" aria-hidden="true" /> {formatCompactNumber(reposts)}
+            <i className="fa-solid fa-retweet" aria-hidden="true" /> {formatCompactNumber(reposts)}
           </button>
           <button type="button" aria-label={t("common:send")} onPointerDown={(e) => bouncePress(e.currentTarget)}>
-            <i className="fa fa-paper-plane" aria-hidden="true" /> {formatCompactNumber(0)}
+            <i className="fa-regular fa-paper-plane" aria-hidden="true" /> {formatCompactNumber(0)}
           </button>
         </div>
       </div>

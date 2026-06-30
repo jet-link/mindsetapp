@@ -22,7 +22,7 @@ export default function BackButton({ className }: { className?: string }) {
         }
       }}
     >
-      <i className="fa fa-arrow-left" aria-hidden="true" />
+      <i className="fa-solid fa-arrow-left" aria-hidden="true" />
     </button>
   );
 }

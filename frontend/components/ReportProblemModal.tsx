@@ -50,7 +50,7 @@ export default function ReportProblemModal({
         onClick={onClose}
         aria-label={t("common:close")}
       >
-        <i className="fa fa-times" aria-hidden="true" />
+        <i className="fa-solid fa-xmark" aria-hidden="true" />
       </button>
       <div
         className="surface-form-lightbox__stage"
@@ -86,7 +86,7 @@ export default function ReportProblemModal({
                 title={t("attachComingSoon")}
                 aria-label={t("attachFile")}
               >
-                <i className="fa fa-paperclip" aria-hidden="true" />
+                <i className="fa-solid fa-paperclip" aria-hidden="true" />
               </button>
             </div>
             <span

@@ -102,7 +102,7 @@ export default function ProfileHeadTools({
           aria-label={t("shareProfile")}
           title={t("shareProfile")}
         >
-          <i className="fa fa-plane-o" aria-hidden="true" />
+          <i className="fa-regular fa-paper-plane" aria-hidden="true" />
         </button>
       )}
 

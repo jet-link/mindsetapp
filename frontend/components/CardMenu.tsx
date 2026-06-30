@@ -105,7 +105,7 @@ export default function CardMenu({
   }
 
   return (
-    <div className="card-menu" ref={rootRef}>
+    <div className={`card-menu${open ? " card-menu--open" : ""}`} ref={rootRef}>
       <button
         type="button"
         className="card-menu__trigger"
@@ -125,6 +125,16 @@ export default function CardMenu({
           <button type="button" className="card-menu__item" role="menuitem" onClick={onCopy}>
             {copyLabel}
           </button>
+          {authed && !isOwn && (
+            <button
+              type="button"
+              className="card-menu__item"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+            >
+              {t("profile:follow")}
+            </button>
+          )}
           {canDelete && (
             <button
               type="button"
@@ -138,7 +148,7 @@ export default function CardMenu({
           {authed && !isOwn && (
             <button
               type="button"
-              className="card-menu__item"
+              className="card-menu__item card-menu__item--danger"
               role="menuitem"
               onClick={() => {
                 setOpen(false);

@@ -86,7 +86,7 @@ export default function ReportContentModal({
         onClick={onClose}
         aria-label={t("common:close")}
       >
-        <i className="fa fa-times" aria-hidden="true" />
+        <i className="fa-solid fa-xmark" aria-hidden="true" />
       </button>
       <div
         className="surface-form-lightbox__stage"

@@ -40,7 +40,7 @@ export default function Modal({
           onClick={onClose}
           aria-label={t("close")}
         >
-          <i className="fa fa-times" aria-hidden="true" />
+          <i className="fa-solid fa-xmark" aria-hidden="true" />
         </button>
         <div className="modal__body">{children}</div>
         {footer && <div className="modal__footer">{footer}</div>}

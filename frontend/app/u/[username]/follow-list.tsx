@@ -304,7 +304,7 @@ export default function FollowList({
         <label className="sr-only" htmlFor="follow-list-search">
           {t("searchUsersInList")}
         </label>
-        <i className="fa fa-search" aria-hidden="true" />
+        <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
         <input
           id="follow-list-search"
           name="q"

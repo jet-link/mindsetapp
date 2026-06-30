@@ -30,9 +30,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var l=localStorage.getItem("mindset-locale");if(l!=="en"&&l!=="ru"&&l!=="uz")l="en";var e=document.documentElement;e.setAttribute("lang",l);e.setAttribute("dir","ltr");}catch(e){}})();`,
           }}
         />
-        <link
-          rel="stylesheet"
-          href="/vendor/font-awesome/css/font-awesome.min.css"
+        {/* Font Awesome (kit) рисует иконки как SVG. По умолчанию он ЗАМЕНЯЕТ
+            <i> на <svg>, из-за чего React падает с removeChild при ремоунте
+            иконки (toggle лайка/пароля). Режим 'nest' вкладывает <svg> ВНУТРЬ
+            <i>, поэтому DOM-узел остаётся под контролем React. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.FontAwesomeConfig={autoReplaceSvg:"nest",observeMutations:true};`,
+          }}
+        />
+        <script
+          src="https://kit.fontawesome.com/8e9347ccb1.js"
+          crossOrigin="anonymous"
+          async
         />
       </head>
       <body suppressHydrationWarning>

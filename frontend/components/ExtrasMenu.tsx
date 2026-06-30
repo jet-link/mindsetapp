@@ -86,7 +86,7 @@ function ExtrasSubpanel({
           aria-label={t("back")}
           onClick={onBack}
         >
-          <i className="fa fa-arrow-left" aria-hidden="true" />
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
         </button>
         <span className="sidenav__extras-subpanel-title">{title}</span>
       </div>
@@ -194,7 +194,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 onClick={() => setPanelView("theme")}
               >
                 {t("theme")}
-                <i className="fa fa-chevron-right" aria-hidden="true" />
+                <i className="fa-solid fa-chevron-right" aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -203,7 +203,7 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 onClick={() => setPanelView("language")}
               >
                 {t("language")}
-                <i className="fa fa-chevron-right" aria-hidden="true" />
+                <i className="fa-solid fa-chevron-right" aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -226,11 +226,11 @@ export default function ExtrasMenu({ variant = "sidenav" }: { variant?: "sidenav
                 options={[
                   {
                     value: "sun",
-                    label: <i className="fa fa-sun" aria-hidden="true" />,
+                    label: <i className="fa-solid fa-sun" aria-hidden="true" />,
                   },
                   {
                     value: "night",
-                    label: <i className="fa fa-moon-o" aria-hidden="true" />,
+                    label: <i className="fa-regular fa-moon" aria-hidden="true" />,
                   },
                   { value: "auto", label: t("auto"), text: true },
                 ]}

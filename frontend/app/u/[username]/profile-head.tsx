@@ -215,7 +215,7 @@ export default function ProfileHead({
             onClick={closeBioModal}
             aria-label={t("common:close")}
           >
-            <i className="fa fa-times" aria-hidden="true" />
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
           <div
             className="surface-form-lightbox__stage"
@@ -271,7 +271,7 @@ export default function ProfileHead({
             onClick={() => setAvatarViewOpen(false)}
             aria-label={t("common:close")}
           >
-            <i className="fa fa-times" aria-hidden="true" />
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
           <div
             className="avatar-lightbox__stage"

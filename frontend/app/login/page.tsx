@@ -41,25 +41,35 @@ export default function LoginPage() {
   const emailMissing = showEmptyErrors && mode === "register" && !email.trim();
   const passwordMissing = showEmptyErrors && !password;
 
-  const usernameInvalid =
-    usernameMissing ||
-    (mode === "login" && authErrorKind === "user_not_found") ||
-    (mode === "register" && !!registerErrors.username);
-  const emailInvalid =
-    emailMissing || (mode === "register" && !!registerErrors.email);
-  const passwordInvalid =
-    passwordMissing ||
-    (mode === "login" &&
-      (authErrorKind === "user_not_found" || authErrorKind === "password_incorrect")) ||
-    (mode === "register" && !!registerErrors.password);
+  // Текст ошибки для каждого поля — показывается строго под своим input.
+  const usernameError = usernameMissing
+    ? t("fieldRequired")
+    : mode === "login" && authErrorKind === "user_not_found"
+      ? error
+      : mode === "register"
+        ? registerErrors.username ?? ""
+        : "";
+  const emailError =
+    mode !== "register"
+      ? ""
+      : emailMissing
+        ? t("fieldRequired")
+        : registerErrors.email ?? "";
+  const passwordError = passwordMissing
+    ? t("fieldRequired")
+    : mode === "login" && authErrorKind === "password_incorrect"
+      ? error
+      : mode === "register"
+        ? registerErrors.password ?? ""
+        : "";
 
-  const registerMessages = Object.values(registerErrors).filter(Boolean);
-  const errorText =
-    mode === "register"
-      ? registerMessages.length
-        ? registerMessages.join("\n")
-        : error
-      : error;
+  const usernameInvalid = !!usernameError;
+  const emailInvalid = !!emailError;
+  const passwordInvalid = !!passwordError;
+
+  // Общая (не привязанная к полю) ошибка: сеть, «что-то пошло не так» и т.п.
+  // В login она появляется, только если это не ошибка конкретного поля.
+  const genericError = mode === "login" && authErrorKind ? "" : error;
 
   function clearAllErrors() {
     setAuthErrorKind(null);
@@ -154,22 +164,30 @@ export default function LoginPage() {
     <form className="form-page" onSubmit={submit} noValidate>
       <h1>{mode === "login" ? t("login") : t("signup")}</h1>
 
-      <label className="sr-only" htmlFor="login-username">
-        {t("username")}
-      </label>
-      <input
-        id="login-username"
-        name="username"
-        placeholder={t("username")}
-        value={username}
-        onChange={(e) => onUsernameChange(e.target.value)}
-        autoComplete="username"
-        className={usernameInvalid ? "input-error" : ""}
-        aria-invalid={usernameInvalid}
-      />
+      <div className="form-field">
+        <label className="sr-only" htmlFor="login-username">
+          {t("username")}
+        </label>
+        <input
+          id="login-username"
+          name="username"
+          placeholder={t("username")}
+          value={username}
+          onChange={(e) => onUsernameChange(e.target.value)}
+          autoComplete="username"
+          className={usernameInvalid ? "input-error" : ""}
+          aria-invalid={usernameInvalid}
+          aria-describedby={usernameError ? "login-username-error" : undefined}
+        />
+        {usernameError && (
+          <p className="field-error" id="login-username-error" role="alert">
+            {usernameError}
+          </p>
+        )}
+      </div>
 
       {mode === "register" && (
-        <>
+        <div className="form-field">
           <label className="sr-only" htmlFor="login-email">
             {t("email")}
           </label>
@@ -183,34 +201,52 @@ export default function LoginPage() {
             autoComplete="email"
             className={emailInvalid ? "input-error" : ""}
             aria-invalid={emailInvalid}
+            aria-describedby={emailError ? "login-email-error" : undefined}
           />
-        </>
+          {emailError && (
+            <p className="field-error" id="login-email-error" role="alert">
+              {emailError}
+            </p>
+          )}
+        </div>
       )}
 
-      <div className={`password-field${passwordInvalid ? " password-field--error" : ""}`}>
-        <label className="sr-only" htmlFor="login-password">
-          {t("password")}
-        </label>
-        <input
-          id="login-password"
-          name="password"
-          placeholder={t("password")}
-          type={showPassword ? "text" : "password"}
-          value={password}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          className={passwordInvalid ? "input-error" : ""}
-          aria-invalid={passwordInvalid}
-        />
-        <button
-          type="button"
-          className="password-field__toggle"
-          onClick={() => setShowPassword((v) => !v)}
-          aria-label={showPassword ? t("hidePassword") : t("showPassword")}
-          title={showPassword ? t("hidePassword") : t("showPassword")}
-        >
-          <i className={`fa ${showPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
-        </button>
+      <div className="form-field">
+        <div className={`password-field${passwordInvalid ? " password-field--error" : ""}`}>
+          <label className="sr-only" htmlFor="login-password">
+            {t("password")}
+          </label>
+          <input
+            id="login-password"
+            name="password"
+            placeholder={t("password")}
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            className={passwordInvalid ? "input-error" : ""}
+            aria-invalid={passwordInvalid}
+            aria-describedby={passwordError ? "login-password-error" : undefined}
+          />
+          <button
+            type="button"
+            className="password-field__toggle"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+            title={showPassword ? t("hidePassword") : t("showPassword")}
+          >
+            <i
+              key={showPassword ? "hide" : "show"}
+              className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+        {passwordError && (
+          <p className="field-error" id="login-password-error" role="alert">
+            {passwordError}
+          </p>
+        )}
       </div>
 
       {mode === "login" && (
@@ -232,9 +268,9 @@ export default function LoginPage() {
       )}
       */}
 
-      {errorText && (
+      {genericError && (
         <div className="error" role="alert">
-          {errorText}
+          {genericError}
         </div>
       )}
 

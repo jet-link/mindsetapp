@@ -380,7 +380,7 @@ export default function SearchPage() {
         <label className="sr-only" htmlFor={searchInputId}>
           {searchLabel}
         </label>
-        <i className="fa fa-search" aria-hidden="true" />
+        <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
         <input
           id={searchInputId}
           name="q"
@@ -426,7 +426,7 @@ export default function SearchPage() {
                           className="discover-search__item"
                           onClick={() => applyRecentChip(item)}
                         >
-                          <i className="fa fa-clock-o" aria-hidden="true" />
+                          <i className="fa-regular fa-clock" aria-hidden="true" />
                           <span>{item.query}</span>
                         </button>
                         {authed && (
@@ -436,7 +436,7 @@ export default function SearchPage() {
                             aria-label={t("removeFromHistory", { query: item.query })}
                             onClick={(e) => removeHistoryItem(item, e)}
                           >
-                            <i className="fa fa-times" aria-hidden="true" />
+                            <i className="fa-solid fa-xmark" aria-hidden="true" />
                           </button>
                         )}
                       </li>

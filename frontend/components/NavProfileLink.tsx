@@ -93,7 +93,7 @@ export default function NavProfileLink({
           <Avatar username={username} src={avatar} />
         </span>
       ) : (
-        <i className="fa fa-user-o" aria-hidden="true" />
+        <i className="fa-regular fa-user" aria-hidden="true" />
       )}
     </Link>
   );

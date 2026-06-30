@@ -18,7 +18,7 @@ import { NAV_ITEMS, type NavItem } from "@/lib/nav-items";
 function navItemIcon(it: NavItem, unread: number, unreadLabel: string) {
   return (
     <span className="bottomnav__icon-wrap">
-      <i className={`fa ${it.icon}`} aria-hidden="true" />
+      <i className={it.icon} aria-hidden="true" />
       {it.badge && unread > 0 && (
         <span className="nav-badge" aria-label={unreadLabel}>
           {unread > 99 ? "99+" : unread}

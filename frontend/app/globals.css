@@ -343,7 +343,8 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600;
 }
 .sidenav__extras-item:hover { background: var(--bubble); }
-.sidenav__extras-item .fa {
+.sidenav__extras-item .fa,
+.sidenav__extras-item .svg-inline--fa {
   width: 18px;
   text-align: center;
   color: var(--text-dim);
@@ -367,7 +368,7 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   justify-content: center;
   min-height: 36px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .sidenav__extras-back {
   all: unset;
@@ -451,16 +452,6 @@ a { color: inherit; text-decoration: none; }
   color: var(--text);
 }
 
-/* Font Awesome 4: solid sun alias (glyph shared with fa-sun-o) */
-.fa-sun:before {
-  content: "\f185";
-}
-
-/* Font Awesome 4: outline plane alias (same glyph as fa-paper-plane-o) */
-.fa-plane-o:before {
-  content: "\f1d9";
-}
-
 /* Поисковая строка */
 .search-bar {
   display: flex;
@@ -474,7 +465,8 @@ a { color: inherit; text-decoration: none; }
   min-height: 44px;
   max-height: 44px;
 }
-.search-bar > .fa,
+.search-bar > i,
+.search-bar > .svg-inline--fa,
 .search-bar__slot,
 .search-bar__clear,
 .search-bar__spinner {
@@ -719,7 +711,8 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-dim);
   text-align: left;
 }
-.discover-search__item .fa {
+.discover-search__item .fa,
+.discover-search__item .svg-inline--fa {
   flex-shrink: 0;
   width: 14px;
   /* margin-top: 3px; */
@@ -733,7 +726,8 @@ a { color: inherit; text-decoration: none; }
   word-break: break-word;
 }
 .discover-search__item:hover,
-.discover-search__item:hover .fa {
+.discover-search__item:hover .fa,
+.discover-search__item:hover .svg-inline--fa {
   color: var(--text);
 }
 
@@ -849,7 +843,7 @@ a { color: inherit; text-decoration: none; }
   bottom: 0;
   z-index: 20;
   margin-top: 16px;
-  padding: 15px 8px calc(14px + env(safe-area-inset-bottom));
+  padding: 17px 8px calc(14px + env(safe-area-inset-bottom));
   background: var(--bg);
   /* border-top: 1px solid var(--border); */
 }
@@ -905,6 +899,21 @@ a { color: inherit; text-decoration: none; }
 }
 
 .card-menu { position: relative; flex-shrink: 0; }
+.card-menu--open { z-index: 1; }
+
+/* Панель меню поверх соседних карточек; list-exit иначе обрезает overflow. */
+.card:has(.card-menu--open) {
+  position: relative;
+  z-index: 50;
+}
+.list-exit:has(.card-menu--open) {
+  overflow: visible;
+}
+.profile-head__tools:has(.card-menu--open) {
+  position: relative;
+  z-index: 50;
+}
+
 .card-menu__trigger {
   all: unset;
   cursor: pointer;
@@ -938,7 +947,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--border);
   border-radius: 12px;
   /* box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); */
-  z-index: 10;
+  z-index: 100;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -1202,7 +1211,8 @@ a { color: inherit; text-decoration: none; }
   border-radius: 999px;
   transform-origin: center;
 }
-.actions button .fa { font-size: 18px; }
+.actions button .fa,
+.actions button .svg-inline--fa { font-size: 18px; }
 .actions button:hover { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
 /* Активное состояние (лайкнуто/репостнуто) — без яркого цвета, просто тёмная иконка */
 .actions button.active { color: var(--text); }
@@ -1295,7 +1305,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
 .icon-btn:hover { background: var(--surface); color: var(--text); }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
 
-.composer--login { align-items: stretch; padding: 18px 5px; }
+.composer--login { align-items: stretch; padding: 18px 0; }
 .composer--placeholder {
   min-height: 110px;
   padding: 14px 5px;
@@ -1528,7 +1538,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   font-size: 16px;
 }
 .profile-head__tool-btn:hover {
-  background: var(--bubble);
+  /* background: var(--bubble); */
   color: var(--text);
 }
 .profile-head .stats {
@@ -1720,6 +1730,23 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Группа «поле + ошибка»: ошибка прижата прямо под своим input. */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  /* gap: 6px; */
+  align-self: stretch;
+}
+.field-error {
+  color: var(--error);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 0 2px;
+  white-space: pre-wrap;
+  margin-bottom: 0;
 }
 
 /* Подсветка пустых обязательных полей при отправке */

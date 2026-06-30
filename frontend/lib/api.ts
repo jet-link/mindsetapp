@@ -410,11 +410,13 @@ export async function login(username: string, password: string, remember = true)
 
   if (!res.ok || !data.ok || !data.access || !data.refresh) {
     const code = data.code ?? "user_not_found";
+    // Логин идёт через серверный роут Next (/api/auth/login) без Accept-Language,
+    // поэтому message из ответа всегда английский. Локализуем на клиенте по коду:
+    // переводы уже загружены, а кодов ошибки всего два.
     const message =
-      data.message ??
-      (code === "password_incorrect"
+      code === "password_incorrect"
         ? tr("auth:passwordIncorrect")
-        : tr("auth:userNotFound"));
+        : tr("auth:userNotFound");
     throw new LoginError(code, message);
   }
 

@@ -109,7 +109,7 @@ export function MediaAttachButton({
         aria-label={t("attachPhoto")}
         onClick={() => inputRef.current?.click()}
       >
-        <i className="fa fa-paperclip" aria-hidden="true" />
+        <i className="fa-solid fa-paperclip" aria-hidden="true" />
       </button>
     </>
   );
@@ -201,7 +201,7 @@ export function MediaPreviews({ picker }: { picker: MediaPicker }) {
                   disabled={isRemoving}
                   onClick={() => handleRemove(it.id)}
                 >
-                  <i className="fa fa-times" aria-hidden="true" />
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>
               </div>
             );

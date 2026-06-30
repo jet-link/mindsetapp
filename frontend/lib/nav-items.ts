@@ -9,12 +9,12 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", icon: "fa-list-alt", labelKey: "mainWall" },
-  { href: "/search", icon: "fa-search", labelKey: "search" },
-  { href: "/compose", icon: "fa-plus-square-o", labelKey: "createTheme", authGated: true },
+  { href: "/", icon: "fa-solid fa-house", labelKey: "mainWall" },
+  { href: "/search", icon: "fa-solid fa-magnifying-glass", labelKey: "search" },
+  { href: "/compose", icon: "fa-solid fa-plus", labelKey: "createTheme", authGated: true },
   {
     href: "/notifications",
-    icon: "fa-bell",
+    icon: "fa-regular fa-bell",
     labelKey: "notifications",
     badge: true,
     authGated: true,

@@ -942,7 +942,7 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  min-width: 180px;
+  min-width: 205px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -955,11 +955,19 @@ a { color: inherit; text-decoration: none; }
   all: unset;
   box-sizing: border-box;
   cursor: pointer;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 12px 14px;
   font-weight: 600;
   font-size: 14px;
+}
+.card-menu__item > i {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--text-dim);
 }
 .card-menu__item:hover { background: var(--bubble); }
 .card-menu__item:disabled {
@@ -968,7 +976,9 @@ a { color: inherit; text-decoration: none; }
 }
 .card-menu__item:disabled:hover { background: transparent; }
 .card-menu__item--danger { color: var(--error); }
-.card-menu__item--danger .fa { color: var(--error); }
+.card-menu__item--danger > i,
+.card-menu__item--danger .fa,
+.card-menu__item--danger .svg-inline--fa { color: var(--error); }
 .card-menu__item--danger:hover { background: color-mix(in srgb, var(--error) 8%, var(--surface)); }
 .card-menu__item--danger:disabled:hover { background: transparent; }
 

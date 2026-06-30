@@ -79,6 +79,7 @@ export default function ProfileHeadTools({
               role="menuitem"
               onClick={copyProfileLink}
             >
+              <i className="fa-solid fa-link" aria-hidden="true" />
               {t("copyProfileLink")}
             </button>
             {showBlockBtn && (
@@ -88,6 +89,7 @@ export default function ProfileHeadTools({
                 role="menuitem"
                 disabled
               >
+                <i className="fa-solid fa-ban" aria-hidden="true" />
                 {t("block")}
               </button>
             )}

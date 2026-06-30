@@ -123,6 +123,7 @@ export default function CardMenu({
       {open && (
         <div className="card-menu__panel" role="menu">
           <button type="button" className="card-menu__item" role="menuitem" onClick={onCopy}>
+            <i className="fa-solid fa-link" aria-hidden="true" />
             {copyLabel}
           </button>
           {authed && !isOwn && (
@@ -132,6 +133,7 @@ export default function CardMenu({
               role="menuitem"
               onClick={() => setOpen(false)}
             >
+              <i className="fa-solid fa-heart-circle-plus" aria-hidden="true" />
               {t("profile:follow")}
             </button>
           )}
@@ -155,6 +157,7 @@ export default function CardMenu({
                 setReportOpen(true);
               }}
             >
+              <i className="fa-solid fa-bullhorn" aria-hidden="true" />
               {t("report")}
             </button>
           )}

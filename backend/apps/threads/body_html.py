@@ -163,7 +163,8 @@ def _embed_youtube_anchors(html: str) -> str:
             f'<iframe src="{embed_url}" title="YouTube video" loading="lazy" '
             f'referrerpolicy="strict-origin-when-cross-origin" '
             f'allow="accelerometer; autoplay; clipboard-write; encrypted-media; '
-            f'gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
+            f'gyroscope; picture-in-picture; web-share; compute-pressure" '
+            f'allowfullscreen></iframe>'
             f'</div></div>'
         )
 

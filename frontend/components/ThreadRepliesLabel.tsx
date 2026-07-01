@@ -60,7 +60,7 @@ export default function ThreadRepliesLabel({
               />
             </button>
 
-            <div className="card-menu__panel replies-sort__panel" role="menu" aria-hidden={!open}>
+            <div className="card-menu__panel replies-sort__panel" role="menu" inert={!open}>
               <button
                 type="button"
                 className={`card-menu__item${sort === "newest" ? " card-menu__item--active" : ""}`}

@@ -33,6 +33,7 @@ export default function VirtualizedFeedList<T>({
   threshold = 80,
   initialCount = 20,
   forceKey = null,
+  forceKeys,
 }: {
   items: T[];
   getKey: (item: T) => Key;
@@ -48,6 +49,8 @@ export default function VirtualizedFeedList<T>({
   initialCount?: number;
   /** Ключ карточки, которую нужно гарантированно держать в DOM (для возврата к якорю). */
   forceKey?: Key | null;
+  /** Дополнительные ключи, которые нужно держать в DOM (например, во время exit-анимации). */
+  forceKeys?: ReadonlySet<Key>;
 }) {
   const active = items.length > threshold;
 
@@ -113,10 +116,20 @@ export default function VirtualizedFeedList<T>({
       }
     }
 
+    if (forceKeys?.size) {
+      for (let i = 0; i < items.length; i++) {
+        const key = getKey(items[i]);
+        if (forceKeys.has(key)) {
+          start = Math.min(start, i);
+          end = Math.max(end, i + 1);
+        }
+      }
+    }
+
     setRange((prev) =>
       prev.start === start && prev.end === end ? prev : { start, end },
     );
-  }, [active, items, getKey, getHeight, overscanPx, forceKey]);
+  }, [active, items, getKey, getHeight, overscanPx, forceKey, forceKeys]);
 
   // Измеряем фактические высоты отрендеренных карточек и пересчитываем окно,
   // если что-то изменилось (поздняя подгрузка картинок/аватара меняет высоту).

@@ -6,9 +6,14 @@ import {
   AUTH_EVENT,
   deleteReply,
   deleteTheme,
+  emitFollowChanged,
+  FOLLOW_EVENT,
+  type FollowChangedDetail,
   type ReplyDeletedDetail,
+  getProfile,
   getStoredUsername,
   isLoggedIn,
+  toggleFollow,
 } from "@/lib/api";
 import { isWithinDeleteWindow } from "@/lib/deletable";
 import ReportContentModal from "@/components/ReportContentModal";
@@ -19,6 +24,7 @@ export default function CardMenu({
   kind,
   path,
   authorUsername,
+  initialAuthorFollowing,
   itemId,
   createdAt,
   isDeletable,
@@ -29,6 +35,7 @@ export default function CardMenu({
   kind: Kind;
   path: string;
   authorUsername: string;
+  initialAuthorFollowing?: boolean;
   itemId: number;
   createdAt: string;
   isDeletable?: boolean;
@@ -44,6 +51,8 @@ export default function CardMenu({
   const [copiedToast, setCopiedToast] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [isOwn, setIsOwn] = useState(false);
+  const [following, setFollowing] = useState(!!initialAuthorFollowing);
+  const followFetchedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const copyLabel = kind === "theme" ? t("copyThemeLink") : t("copyReplyLink");
@@ -60,6 +69,62 @@ export default function CardMenu({
     window.addEventListener(AUTH_EVENT, syncAuth);
     return () => window.removeEventListener(AUTH_EVENT, syncAuth);
   }, [authorUsername]);
+
+  useEffect(() => {
+    followFetchedRef.current = false;
+    setFollowing(!!initialAuthorFollowing);
+  }, [authorUsername, initialAuthorFollowing]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const card = root.closest(".card");
+    const tools = root.closest(".profile-head__tools");
+    // Карточка в ленте может быть обёрнута сразу в несколько .list-exit
+    // (вкладка Following добавляет ещё один слой), и у каждого overflow: hidden
+    // обрезал бы панель. Поднимаем и раскрываем overflow у всех предков.
+    const listExits: Element[] = [];
+    for (let node: Element | null = root; node; node = node.parentElement) {
+      if (node.classList.contains("list-exit")) listExits.push(node);
+    }
+
+    if (open) {
+      card?.classList.add("card--menu-open");
+      tools?.classList.add("profile-head__tools--menu-open");
+      listExits.forEach((el) => el.classList.add("list-exit--menu-open"));
+    } else {
+      card?.classList.remove("card--menu-open");
+      tools?.classList.remove("profile-head__tools--menu-open");
+      listExits.forEach((el) => el.classList.remove("list-exit--menu-open"));
+    }
+
+    return () => {
+      card?.classList.remove("card--menu-open");
+      tools?.classList.remove("profile-head__tools--menu-open");
+      listExits.forEach((el) => el.classList.remove("list-exit--menu-open"));
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const onFollow = (e: Event) => {
+      const { profileUsername, following: nextFollowing } = (
+        e as CustomEvent<FollowChangedDetail>
+      ).detail;
+      if (profileUsername === authorUsername && nextFollowing !== undefined) {
+        setFollowing(nextFollowing);
+      }
+    };
+    window.addEventListener(FOLLOW_EVENT, onFollow);
+    return () => window.removeEventListener(FOLLOW_EVENT, onFollow);
+  }, [authorUsername]);
+
+  useEffect(() => {
+    if (!open || isOwn || !authed || followFetchedRef.current) return;
+    followFetchedRef.current = true;
+    getProfile(authorUsername)
+      .then((p) => setFollowing(p.is_following))
+      .catch(() => {});
+  }, [open, isOwn, authed, authorUsername]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +145,26 @@ export default function CardMenu({
     setOpen(false);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 3500);
+  }
+
+  async function onFollowToggle() {
+    const optimistic = !following;
+    setFollowing(optimistic);
+    try {
+      const r = await toggleFollow(authorUsername);
+      setFollowing(r.following);
+      const viewer = getStoredUsername() ?? undefined;
+      emitFollowChanged({
+        profileUsername: authorUsername,
+        following: r.following,
+        followers_count: r.followers_count,
+        viewerUsername: viewer,
+        viewer_following_count: r.following_count,
+      });
+    } catch {
+      setFollowing(!optimistic);
+      window.location.href = "/login";
+    }
   }
 
   async function onDelete() {
@@ -111,6 +196,8 @@ export default function CardMenu({
         className="card-menu__trigger"
         aria-label={t("common:moreActions")}
         title={t("common:moreActions")}
+        aria-expanded={open}
+        aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
       >
         <span className="card-menu__dots" aria-hidden="true">
@@ -120,9 +207,12 @@ export default function CardMenu({
         </span>
       </button>
 
-      {open && (
-        <div className="card-menu__panel" role="menu">
-          <button type="button" className="card-menu__item" role="menuitem" onClick={onCopy}>
+      <div
+        className="card-menu__panel"
+        role="menu"
+        aria-hidden={!open}
+      >
+          <button type="button" className="card-menu__item" role="menuitem" tabIndex={open ? 0 : -1} onClick={onCopy}>
             <i className="fa-solid fa-link" aria-hidden="true" />
             {copyLabel}
           </button>
@@ -131,10 +221,15 @@ export default function CardMenu({
               type="button"
               className="card-menu__item"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              tabIndex={open ? 0 : -1}
+              onClick={onFollowToggle}
             >
-              <i className="fa-solid fa-heart-circle-plus" aria-hidden="true" />
-              {t("profile:follow")}
+              <i
+                key={following ? "unfollow" : "follow"}
+                className={`fa-solid ${following ? "fa-heart-circle-minus" : "fa-heart-circle-plus"}`}
+                aria-hidden="true"
+              />
+              {following ? t("profile:unfollow") : t("profile:follow")}
             </button>
           )}
           {canDelete && (
@@ -142,6 +237,7 @@ export default function CardMenu({
               type="button"
               className="card-menu__item card-menu__item--danger"
               role="menuitem"
+              tabIndex={open ? 0 : -1}
               onClick={onDelete}
             >
               <i className="fa-regular fa-trash-can" aria-hidden="true" />
@@ -153,6 +249,7 @@ export default function CardMenu({
               type="button"
               className="card-menu__item card-menu__item--danger"
               role="menuitem"
+              tabIndex={open ? 0 : -1}
               onClick={() => {
                 setOpen(false);
                 setReportOpen(true);
@@ -162,8 +259,7 @@ export default function CardMenu({
               {t("report")}
             </button>
           )}
-        </div>
-      )}
+      </div>
 
       {copiedToast && (
         <div className="copy-overlay" role="status">

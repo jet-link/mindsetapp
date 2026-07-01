@@ -313,6 +313,10 @@ const EMPTY_TEXT_KEYS: Record<ProfileTab, string> = {
   reposts: "noRepostsYet",
 };
 
+// Вкладку профиля восстанавливаем ТОЛЬКО при возврате назад из детального
+// просмотра (по return-anchor — он живёт лишь до возврата и затем сбрасывается).
+// При обычном заходе на профиль (переход с другой страницы) открываем первую
+// вкладку. Кэш данных вкладок при этом сохраняем для скорости.
 function resolveInitialTab(username: string): ProfileTab {
   const anchor = findReturnAnchorByPrefix(`/u/${username}?`);
   if (anchor) {
@@ -355,9 +359,9 @@ function normalizeSlices(
 }
 
 function resolveInitialState(username: string): InitialState {
+  const tab = resolveInitialTab(username);
   const cached = getProfileTabsCache(username);
   if (cached) {
-    const tab = cached.tab;
     const slices = normalizeSlices(cached.slices);
     return {
       tab,
@@ -365,7 +369,6 @@ function resolveInitialState(username: string): InitialState {
       loadingTab: slices[tab].loaded ? null : tab,
     };
   }
-  const tab = resolveInitialTab(username);
   return { tab, slices: emptySlices(), loadingTab: tab };
 }
 

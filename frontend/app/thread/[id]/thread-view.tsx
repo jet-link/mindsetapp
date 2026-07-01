@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThemeCard from "@/components/ThemeCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
+import { sortReplies, type ReplySort } from "@/lib/reply-sort";
 import ReplyForm from "./reply-form";
 import { Reply, Theme, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, THEME_LIKE_EVENT, THEME_REPOST_EVENT, ThemeLikeDetail, ThemeRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail, getThread } from "@/lib/api";
 import { getThreadCache, setThreadCache } from "@/lib/detail-cache";
@@ -33,9 +34,11 @@ export default function ThreadView({
     initialTheme ? reconcileThemeViewerFlags(initialTheme) : null,
   );
   const [replies, setReplies] = useState<Reply[]>(initialCache?.replies ?? []);
+  const [sort, setSort] = useState<ReplySort>("newest");
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
   const listKey = `/thread/${id}`;
+  const sortedReplies = useMemo(() => sortReplies(replies, sort), [replies, sort]);
 
   useEffect(() => {
     setListKey(listKey);
@@ -206,19 +209,27 @@ export default function ThreadView({
           threadLineBelow={replies.length > 0}
           onDeleted={() => router.push("/")}
         />
-        {replies.length > 0 && <ThreadRepliesLabel />}
+        {replies.length > 0 && (
+          <ThreadRepliesLabel
+            sort={sort}
+            onSortChange={setSort}
+            showSort={replies.length > 1}
+          />
+        )}
         <div className="thread-replies">
           {replies.length === 0 && <p className="muted">{t("noRepliesYet")}</p>}
-          {replies.map((r, i) => (
-            <ReplyCard
-              key={r.id}
-              reply={r}
-              indented
-              clickable
-              threadLineBelow={i < replies.length - 1}
-              onDeleted={() => setReplies((prev) => prev.filter((x) => x.id !== r.id))}
-            />
-          ))}
+          <div key={sort} className="thread-replies__list thread-replies__list--animate">
+            {sortedReplies.map((r, i) => (
+              <ReplyCard
+                key={r.id}
+                reply={r}
+                indented
+                clickable
+                threadLineBelow={i < sortedReplies.length - 1}
+                onDeleted={() => setReplies((prev) => prev.filter((x) => x.id !== r.id))}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </main>

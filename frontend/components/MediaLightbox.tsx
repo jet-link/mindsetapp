@@ -68,6 +68,13 @@ export default function MediaLightbox({
     };
   }, []);
 
+  // Снимаем фокус с миниатюры, открывшей просмотрщик: иначе стрелки клавиатуры
+  // прокручивают фоновую карусель .card-media параллельно с просмотрщиком.
+  useEffect(() => {
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === "function") active.blur();
+  }, []);
+
   // Стартовая позиция — без анимации, сразу на нужном кадре.
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -109,15 +116,25 @@ export default function MediaLightbox({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight" && hasNav) go(1);
-      else if (e.key === "ArrowLeft" && hasNav) go(-1);
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowRight" && hasNav) {
+        // preventDefault — чтобы стрелка не прокручивала фоновую карусель.
+        e.preventDefault();
+        go(1);
+      } else if (e.key === "ArrowLeft" && hasNav) {
+        e.preventDefault();
+        go(-1);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go, hasNav, onClose]);
 
   function onBackdropClick(e: ReactMouseEvent) {
+    // Просмотрщик рендерится внутри карточки — гасим всплытие, иначе клик по
+    // тёмной области/изображению доходит до тела карточки и открывает тему/ответ.
+    e.stopPropagation();
     // Не закрываем сразу после свайпа/скролла.
     if (Date.now() - lastScrollTs.current < 120) return;
     const target = e.target as HTMLElement;

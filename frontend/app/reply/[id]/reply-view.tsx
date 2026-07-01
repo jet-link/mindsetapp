@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/PageHeader";
 import ReplyCard from "@/components/ReplyCard";
 import ThreadRepliesLabel from "@/components/ThreadRepliesLabel";
+import { sortReplies, type ReplySort } from "@/lib/reply-sort";
 import ReplyForm from "@/app/thread/[id]/reply-form";
 import { Reply, REPLY_CREATED_EVENT, REPLY_DELETED_EVENT, REPLY_LIKE_EVENT, REPLY_REPOST_EVENT, ReplyCreatedDetail, ReplyDeletedDetail, ReplyLikeDetail, ReplyRepostDetail, USER_PROFILE_EVENT, UserProfileUpdatedDetail, getReplyDetail } from "@/lib/api";
 import { getReplyDetailCache, setReplyDetailCache } from "@/lib/detail-cache";
@@ -34,9 +35,11 @@ export default function ReplyThreadView({
     initialReply ? reconcileReplyViewerFlags(initialReply) : null,
   );
   const [children, setChildren] = useState<Reply[]>(initialCache?.children ?? []);
+  const [sort, setSort] = useState<ReplySort>("newest");
   const [loading, setLoading] = useState(!initialCache || !!focusReplyId);
   const [error, setError] = useState("");
   const listKey = `/reply/${id}`;
+  const sortedChildren = useMemo(() => sortReplies(children, sort), [children, sort]);
 
   useEffect(() => {
     setListKey(listKey);
@@ -189,19 +192,27 @@ export default function ReplyThreadView({
           threadLineBelow={children.length > 0}
           onDeleted={() => router.push(`/thread/${reply.theme_id}`)}
         />
-        {children.length > 0 && <ThreadRepliesLabel />}
+        {children.length > 0 && (
+          <ThreadRepliesLabel
+            sort={sort}
+            onSortChange={setSort}
+            showSort={children.length > 1}
+          />
+        )}
         <div className="thread-replies">
           {children.length === 0 && <p className="muted">{t("noRepliesYet")}</p>}
-          {children.map((r, i) => (
-            <ReplyCard
-              key={r.id}
-              reply={r}
-              indented
-              clickable
-              threadLineBelow={i < children.length - 1}
-              onDeleted={() => setChildren((prev) => prev.filter((x) => x.id !== r.id))}
-            />
-          ))}
+          <div key={sort} className="thread-replies__list thread-replies__list--animate">
+            {sortedChildren.map((r, i) => (
+              <ReplyCard
+                key={r.id}
+                reply={r}
+                indented
+                clickable
+                threadLineBelow={i < sortedChildren.length - 1}
+                onDeleted={() => setChildren((prev) => prev.filter((x) => x.id !== r.id))}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </main>

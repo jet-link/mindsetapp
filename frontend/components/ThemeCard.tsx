@@ -252,6 +252,7 @@ export default function ThemeCard({
             kind="theme"
             path={`/thread/${theme.id}`}
             authorUsername={theme.author.username}
+            initialAuthorFollowing={theme.author.is_following}
             itemId={theme.id}
             createdAt={theme.created_at}
             isDeletable={theme.is_deletable}

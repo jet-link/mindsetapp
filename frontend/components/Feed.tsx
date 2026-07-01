@@ -9,6 +9,7 @@ import LoginCta from "@/components/LoginCta";
 import VirtualizedFeedList from "@/components/VirtualizedFeedList";
 import AnimatedTabBar from "@/components/AnimatedTabBar";
 import ListEnterItem from "@/components/ListEnterItem";
+import ListExitWrap from "@/components/ListExitWrap";
 import {
   AUTH_EVENT,
   FOLLOW_EVENT,
@@ -34,7 +35,6 @@ import {
 import {
   getFeedCache,
   setFeedCache,
-  getLastFeedTab,
   setLastFeedTab,
   removeAuthorFromFollowingFeedCache,
   hydrateFeedCacheFromDisk,
@@ -70,10 +70,6 @@ function emptySlices(): Record<WallTab, TabSlice> {
   return { "for-you": emptySlice(), following: emptySlice() };
 }
 
-function normalizeTab(tab: string): WallTab {
-  return tab === "following" ? "following" : "for-you";
-}
-
 function cursorFromNext(next: string | null): string | null {
   return next ? new URL(next, "http://x").searchParams.get("cursor") : null;
 }
@@ -104,13 +100,21 @@ function mapSlices(
   return next;
 }
 
+function normalizeTab(tab: string): WallTab {
+  return tab === "following" ? "following" : "for-you";
+}
+
+// Вкладку восстанавливаем ТОЛЬКО при возврате назад из детального просмотра
+// (по return-anchor — он живёт лишь до возврата и затем сбрасывается). При
+// обычном заходе на ленту (переход с другой страницы, logout/повторный вход)
+// открываем вкладку по умолчанию «For you».
 function initialWallTab(): WallTab {
   const anchor = findReturnAnchorByPrefix("/?tab=");
   if (anchor) {
     const tab = parseListKeySearchParams(anchor.listKey).get("tab");
     if (tab) return normalizeTab(tab);
   }
-  return normalizeTab(getLastFeedTab());
+  return "for-you";
 }
 
 export default function Feed() {
@@ -127,6 +131,9 @@ export default function Feed() {
     return cached && cached.themes.length ? null : initialTab;
   });
   const [error, setError] = useState("");
+  const [exitingFollowingThemeIds, setExitingFollowingThemeIds] = useState<Set<number>>(
+    () => new Set(),
+  );
 
   const slicesRef = useRef(slices);
   const tabRef = useRef<WallTab>(initialTab);
@@ -473,6 +480,22 @@ export default function Feed() {
     }
   }, [slices]);
 
+  const removeFollowingThemeAfterExit = useCallback((themeId: number) => {
+    setExitingFollowingThemeIds((prev) => {
+      if (!prev.has(themeId)) return prev;
+      const next = new Set(prev);
+      next.delete(themeId);
+      return next;
+    });
+    setSlices((prev) => ({
+      ...prev,
+      following: {
+        ...prev.following,
+        themes: prev.following.themes.filter((t) => t.id !== themeId),
+      },
+    }));
+  }, []);
+
   useEffect(() => {
     const onFollow = (e: Event) => {
       const { profileUsername, following } = (e as CustomEvent<FollowChangedDetail>).detail;
@@ -491,15 +514,16 @@ export default function Feed() {
       }
       if (following !== false) return;
       removeAuthorFromFollowingFeedCache(profileUsername);
-      setSlices((prev) => ({
-        ...prev,
-        following: {
-          ...prev.following,
-          themes: prev.following.themes.filter(
-            (t) => t.author.username !== profileUsername,
-          ),
-        },
-      }));
+      const idsToExit: number[] = [];
+      for (const t of slicesRef.current.following.themes) {
+        if (t.author.username === profileUsername) idsToExit.push(t.id);
+      }
+      if (idsToExit.length === 0) return;
+      setExitingFollowingThemeIds((prev) => {
+        const next = new Set(prev);
+        for (const id of idsToExit) next.add(id);
+        return next;
+      });
     };
     window.addEventListener(FOLLOW_EVENT, onFollow);
     return () => window.removeEventListener(FOLLOW_EVENT, onFollow);
@@ -689,22 +713,34 @@ export default function Feed() {
                 className="feed-list"
                 getKey={(t) => t.id}
                 forceKey={isActive ? anchorThemeId : null}
-                renderItem={(t, index) => (
-                  <ListEnterItem index={index} animate={isActive && itemEnter}>
-                    <ThemeCard
-                      theme={t}
-                      onDeleted={() =>
-                        setSlices((prev) => ({
-                          ...prev,
-                          [tabId]: {
-                            ...prev[tabId],
-                            themes: prev[tabId].themes.filter((x) => x.id !== t.id),
-                          },
-                        }))
-                      }
-                    />
-                  </ListEnterItem>
-                )}
+                forceKeys={tabId === "following" ? exitingFollowingThemeIds : undefined}
+                renderItem={(t, index) => {
+                  const card = (
+                    <ListEnterItem index={index} animate={isActive && itemEnter}>
+                      <ThemeCard
+                        theme={t}
+                        onDeleted={() =>
+                          setSlices((prev) => ({
+                            ...prev,
+                            [tabId]: {
+                              ...prev[tabId],
+                              themes: prev[tabId].themes.filter((x) => x.id !== t.id),
+                            },
+                          }))
+                        }
+                      />
+                    </ListEnterItem>
+                  );
+                  if (tabId !== "following") return card;
+                  return (
+                    <ListExitWrap
+                      exiting={exitingFollowingThemeIds.has(t.id)}
+                      onExitComplete={() => removeFollowingThemeAfterExit(t.id)}
+                    >
+                      {card}
+                    </ListExitWrap>
+                  );
+                }}
               />
 
               {isActive && isLoading && slice.themes.length === 0 && (

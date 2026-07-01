@@ -53,7 +53,7 @@ export default function ProfileHeadTools({
   }
 
   return (
-    <div className="profile-head__tools" ref={rootRef}>
+    <div className={`profile-head__tools${menuOpen ? " profile-head__tools--menu-open" : ""}`} ref={rootRef}>
       {showPlaneBtn && (
         <button
           type="button"
@@ -65,7 +65,7 @@ export default function ProfileHeadTools({
         </button>
       )}
 
-      <div className="card-menu">
+      <div className={`card-menu${menuOpen ? " card-menu--open" : ""}`}>
         <button
           type="button"
           className="card-menu__trigger"
@@ -82,12 +82,12 @@ export default function ProfileHeadTools({
           </span>
         </button>
 
-        {menuOpen && (
-          <div className="card-menu__panel" role="menu">
+        <div className="card-menu__panel" role="menu" aria-hidden={!menuOpen}>
             <button
               type="button"
               className="card-menu__item"
               role="menuitem"
+              tabIndex={menuOpen ? 0 : -1}
               onClick={copyProfileLink}
             >
               <i className="fa-solid fa-link" aria-hidden="true" />
@@ -98,6 +98,7 @@ export default function ProfileHeadTools({
                 type="button"
                 className="card-menu__item"
                 role="menuitem"
+                tabIndex={menuOpen ? 0 : -1}
                 onClick={() => setMenuOpen(false)}
               >
                 <i className="fa-solid fa-gear" aria-hidden="true" />
@@ -109,14 +110,14 @@ export default function ProfileHeadTools({
                 type="button"
                 className="card-menu__item card-menu__item--danger"
                 role="menuitem"
+                tabIndex={menuOpen ? 0 : -1}
                 disabled
               >
                 <i className="fa-solid fa-ban" aria-hidden="true" />
                 {t("block")}
               </button>
             )}
-          </div>
-        )}
+        </div>
       </div>
 
       {copiedToast && (

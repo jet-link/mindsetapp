@@ -159,7 +159,7 @@ a { color: inherit; text-decoration: none; }
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 30;
+  z-index: 70;
   height: 58px;
   padding: 0 8px env(safe-area-inset-bottom);
   background: var(--bg);
@@ -838,8 +838,7 @@ a { color: inherit; text-decoration: none; }
 .feed-tabs { margin-top: 4px; }
 
 /* Призыв войти для гостей — закреплён снизу ленты.
-   z-index выше .card:has(.card-menu--open) (50), иначе при открытии «…» карточка
-   перекрывает CTA. У гостя в меню только «Copy link» — панель не доходит до CTA. */
+   z-index между card-menu (50) и bottomnav (70). */
 .login-cta {
   position: sticky;
   bottom: 0;
@@ -901,17 +900,27 @@ a { color: inherit; text-decoration: none; }
 }
 
 .card-menu { position: relative; flex-shrink: 0; }
-.card-menu--open { z-index: 1; }
+.card-menu--open { z-index: 2; }
 
-/* Панель меню поверх соседних карточек; list-exit иначе обрезает overflow. */
-.card:has(.card-menu--open) {
+/* Классы вешает CardMenu через closest(), без :has() — иначе при каждом
+   открытии меню браузер пересчитывает все карточки ленты и анимация дёргается. */
+.card--menu-open {
+  position: relative;
+}
+.card--menu-open .card-head {
+  position: relative;
+  z-index: 2;
+}
+/* z-index на .card не поднимает меню над соседними карточками — только на
+   .list-exit, иначе панель уходит под тело следующей темы/ответа.
+   Двойной класс — чтобы overflow: visible победил базовый .list-exit
+   { overflow: hidden }, который объявлен ниже по файлу. */
+.list-exit.list-exit--menu-open {
   position: relative;
   z-index: 50;
-}
-.list-exit:has(.card-menu--open) {
   overflow: visible;
 }
-.profile-head__tools:has(.card-menu--open) {
+.profile-head__tools--menu-open {
   position: relative;
   z-index: 50;
 }
@@ -951,10 +960,37 @@ a { color: inherit; text-decoration: none; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  /* box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); */
   z-index: 100;
   overflow: hidden;
   box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.92);
+  transform-origin: center center;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s cubic-bezier(0.34, 1.1, 0.64, 1),
+    visibility 0s linear 0.18s;
+}
+.card-menu--open .card-menu__panel {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1);
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s cubic-bezier(0.34, 1.1, 0.64, 1),
+    visibility 0s linear 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-menu__panel {
+    transform: none;
+    transition: opacity 0.1s ease, visibility 0s linear 0.1s;
+  }
+  .card-menu--open .card-menu__panel {
+    transition: opacity 0.1s ease, visibility 0s linear 0s;
+  }
 }
 .card-menu__item {
   all: unset;
@@ -1844,6 +1880,7 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   /* gap: 10px; */
   padding: var(--thread-gap) 0;
   align-items: center;
+  position: relative;
 }
 .thread-replies-label__line-col {
   position: relative;
@@ -1867,8 +1904,15 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
-.thread-replies-label__text {
+.thread-replies-label__main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.thread-replies-label__text {
   margin: 0;
   text-align: center;
   font-weight: 700;
@@ -1885,6 +1929,40 @@ textarea:focus { outline: 2px solid var(--focus-ring); }
   background: #f3f3f3;
   border-radius: 999px;
 } */
+
+/* Сортировка ответов: кнопка стоит рядом с текстом «Ответы». */
+.replies-sort {
+  position: relative;
+  flex-shrink: 0;
+}
+.replies-sort__trigger {
+  all: unset;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+.replies-sort__trigger:hover { background: var(--bubble); color: var(--text); }
+.replies-sort--open .replies-sort__trigger { color: var(--text); }
+
+.replies-sort__panel { min-width: 180px; }
+.card-menu__item--active { color: var(--brand); }
+.card-menu__item--active > i { color: var(--brand); }
+
+/* Плавная смена сортировки списка ответов */
+@keyframes repliesSortIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.thread-replies__list--animate { animation: repliesSortIn 0.28s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .thread-replies__list--animate { animation: none; }
+}
 
 .profile-reply-thread + .profile-reply-thread {
   border-top: 1px solid var(--border);

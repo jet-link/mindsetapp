@@ -291,6 +291,7 @@ export default function ReplyCard({
             kind="reply"
             path={`/reply/${reply.id}`}
             authorUsername={reply.author.username}
+            initialAuthorFollowing={reply.author.is_following}
             itemId={reply.id}
             createdAt={reply.created_at}
             isDeletable={reply.is_deletable}

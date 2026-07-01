@@ -7,11 +7,15 @@ import {
 
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-// Сколько кадров ждём появления элемента в DOM, прежде чем сдаться.
-const MAX_NOT_FOUND_FRAMES = 16;
-// Сколько удерживаем карточку на месте, докручивая при сдвигах layout
-// (поздняя загрузка аватара/шапки/картинок). Прерывается действием пользователя.
-const PIN_DURATION_MS = 1200;
+// Сколько ждём появления элемента в DOM (async-загрузка списка), прежде чем сдаться.
+const NOT_FOUND_TIMEOUT_MS = 2500;
+// Абсолютный максимум удержания карточки на месте (страховка от вечного цикла).
+const PIN_HARD_CAP_MS = 6000;
+// Сколько layout должен «молчать» (без сдвигов), чтобы отпустить позицию.
+// Пока над карточкой догружаются картинки/эмбеды в длинном треде — список
+// растёт, цель смещается, и мы продолжаем докручивать; как только рост
+// прекратился на QUIET_MS — считаем позицию восстановленной.
+const PIN_QUIET_MS = 340;
 
 interface Options {
   /** Если якоря для этого списка нет — прокрутить наверх (для детальных страниц). */
@@ -45,56 +49,67 @@ export function useRestoreAnchor(listKey: string, ready: boolean, options: Optio
 
     let cancelled = false;
     let rafId = 0;
-    let notFound = 0;
-    const start =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
     const now = () =>
       typeof performance !== "undefined" ? performance.now() : Date.now();
+    const start = now();
+    // Последний момент, когда пришлось докрутить (layout ещё «дышит»).
+    let lastAdjust = start;
 
-    const stop = () => {
+    const stop = (reason: string) => {
       if (cancelled) return;
       cancelled = true;
       cancelAnimationFrame(rafId);
-      window.removeEventListener("wheel", stop);
-      window.removeEventListener("touchstart", stop);
-      window.removeEventListener("pointerdown", stop);
-      window.removeEventListener("keydown", stop);
-      clearReturnAnchor(listKey);
+      window.removeEventListener("wheel", onUser);
+      window.removeEventListener("touchstart", onUser);
+      window.removeEventListener("pointerdown", onUser);
+      window.removeEventListener("keydown", onUser);
+      // Якорь снимаем только когда восстановление реально завершилось (settled/
+      // hardcap/действие пользователя). На "cleanup" (размонтирование или
+      // повторный прогон эффекта в StrictMode) НЕ трогаем: иначе повторный
+      // прогон не найдёт якорь и уедет наверх (scrollTopWhenNoAnchor).
+      if (reason !== "cleanup") clearReturnAnchor(listKey);
     };
+
+    const onUser = () => stop("user-interaction");
 
     const frame = () => {
       if (cancelled) return;
 
       const target = computeAnchorTop(anchor);
       if (target === null) {
-        if (++notFound >= MAX_NOT_FOUND_FRAMES) {
-          stop();
+        // Элемента ещё нет в DOM (список догружается) — ждём его появления.
+        if (now() - start > NOT_FOUND_TIMEOUT_MS) {
+          stop("notfound-timeout");
           return;
         }
         rafId = requestAnimationFrame(frame);
         return;
       }
 
-      // Докручиваем только при реальном сдвиге, чтобы не мешать ничему лишним.
+      // Докручиваем только при реальном сдвиге. Каждый сдвиг — признак того, что
+      // над карточкой ещё меняется layout (догрузка картинок/эмбедов в длинном
+      // треде), поэтому продлеваем удержание, пока рост не прекратится.
       if (Math.abs(window.scrollY - target) > 1) {
         window.scrollTo({ top: target, left: 0, behavior: "instant" as ScrollBehavior });
+        lastAdjust = now();
       }
 
-      if (now() - start > PIN_DURATION_MS) {
-        stop();
+      const settled = now() - lastAdjust > PIN_QUIET_MS;
+      if (settled || now() - start > PIN_HARD_CAP_MS) {
+        stop(settled ? "settled" : "hardcap");
         return;
       }
       rafId = requestAnimationFrame(frame);
     };
 
     // Пользователь сам начал прокрутку/взаимодействие — сразу отпускаем позицию.
-    window.addEventListener("wheel", stop, { passive: true });
-    window.addEventListener("touchstart", stop, { passive: true });
-    window.addEventListener("pointerdown", stop, { passive: true });
-    window.addEventListener("keydown", stop);
+    window.addEventListener("wheel", onUser, { passive: true });
+    window.addEventListener("touchstart", onUser, { passive: true });
+    window.addEventListener("pointerdown", onUser, { passive: true });
+    window.addEventListener("keydown", onUser);
 
     frame();
 
-    return stop;
+    return () => stop("cleanup");
   }, [listKey, ready, scrollTopWhenNoAnchor]);
 }

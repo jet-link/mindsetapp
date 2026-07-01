@@ -9,7 +9,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", icon: "fa-solid fa-house", labelKey: "mainWall" },
+  { href: "/", icon: "fa-regular fa-house", labelKey: "mainWall" },
   { href: "/search", icon: "fa-solid fa-magnifying-glass", labelKey: "search" },
   { href: "/compose", icon: "fa-solid fa-plus", labelKey: "createTheme", authGated: true },
   {

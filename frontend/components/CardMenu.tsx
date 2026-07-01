@@ -144,6 +144,7 @@ export default function CardMenu({
               role="menuitem"
               onClick={onDelete}
             >
+              <i className="fa-regular fa-trash-can" aria-hidden="true" />
               {t("delete")}
             </button>
           )}

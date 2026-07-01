@@ -26,6 +26,7 @@ import {
   clearProfileTabsCache,
   markProfileSliceStale,
   prependReplyToProfileCache,
+  prependReplyMediaToProfileCache,
   prependRepostToProfileCache,
   prependReplyRepostToProfileCache,
   prependThemeToProfileCache,
@@ -866,6 +867,9 @@ export function emitReplyCreated(detail: ReplyCreatedDetail) {
     // помечаем вкладку Replies на дозагрузку, чтобы показать свежее.
     markProfileSliceStale("replies");
   }
+  // Медиа ответа кладём во вкладку Media независимо от сборки profileReply:
+  // элементы самодостаточны (несут theme_id/reply_id), тема в кэше не нужна.
+  prependReplyMediaToProfileCache(detail.reply);
   applyReplyCreated(detail);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(REPLY_CREATED_EVENT, { detail }));

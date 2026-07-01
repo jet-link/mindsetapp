@@ -47,7 +47,9 @@ import {
   PROFILE_TABS,
   buildProfileReplyFromCreated,
   getProfileTabsCache,
+  replyMediaTabItems,
   setProfileTabsCache,
+  themeMediaTabItems,
 } from "@/lib/profile-tabs-cache";
 import { findReplyInAllCaches, findThemeInAllCaches } from "@/lib/theme-cache-lookup";
 import { useInfiniteScroll } from "@/lib/use-infinite-scroll";
@@ -242,6 +244,19 @@ function prependReplyToSlice(
       replies: [profileReply, ...repliesSlice.replies],
     },
   };
+}
+
+/** Мгновенно добавляет медиа нового поста в начало вкладки Media (дедуп по файлу). */
+function prependMediaToSlice(
+  slices: Record<ProfileTab, TabSlice>,
+  items: MediaItem[],
+): Record<ProfileTab, TabSlice> {
+  const mediaSlice = slices.media;
+  // Незагруженный срез не достраиваем — при открытии он подтянет свежее с сервера.
+  if (items.length === 0 || !mediaSlice.loaded) return slices;
+  const media = dedupeMedia([...items, ...mediaSlice.media]);
+  if (media.length === mediaSlice.media.length) return slices;
+  return { ...slices, media: { ...mediaSlice, media } };
 }
 
 function patchReplyCountsInSlices(
@@ -978,12 +993,20 @@ export default function ProfileTabs({
     const onThemeCreated = (e: Event) => {
       const theme = (e as CustomEvent<Theme>).detail;
       if (username !== getStoredUsername() || theme.author.username !== username) return;
-      setSlices((prev) => prependThemeToSlice(prev, theme));
-      setTabCounts((c) => ({ ...c, themes: c.themes + 1 }));
+      const mediaItems = themeMediaTabItems(theme);
+      setSlices((prev) => prependMediaToSlice(prependThemeToSlice(prev, theme), mediaItems));
+      setTabCounts((c) => ({
+        ...c,
+        themes: c.themes + 1,
+        media: c.media + mediaItems.length,
+      }));
     };
     const onReplyCreated = (e: Event) => {
       const detail = (e as CustomEvent<ReplyCreatedDetail>).detail;
       const { themeId, parentId, themeRepliesCount, parentRepliesCount, reply } = detail;
+      const isOwn =
+        username === getStoredUsername() && reply.author.username === username;
+      const mediaItems = isOwn ? replyMediaTabItems(reply) : [];
       setSlices((prev) => {
         let next = patchReplyCountsInSlices(
           prev,
@@ -992,21 +1015,26 @@ export default function ProfileTabs({
           themeRepliesCount,
           parentRepliesCount,
         );
-        if (username !== getStoredUsername() || reply.author.username !== username) {
-          return next;
-        }
+        if (!isOwn) return next;
         const profileReply = buildProfileReplyFromCreated(detail);
         if (!profileReply) {
           // Не собрали корректный элемент (нет темы/родителя в кэше) —
           // помечаем срез на дозагрузку, чтобы открытие вкладки показало свежее.
-          return next.replies.loaded
-            ? { ...next, replies: { ...next.replies, loaded: false } }
-            : next;
+          if (next.replies.loaded) {
+            next = { ...next, replies: { ...next.replies, loaded: false } };
+          }
+        } else {
+          next = prependReplyToSlice(next, profileReply);
         }
-        return prependReplyToSlice(next, profileReply);
+        // Медиа добавляем независимо от сборки ответа — элементы самодостаточны.
+        return prependMediaToSlice(next, mediaItems);
       });
-      if (username === getStoredUsername() && reply.author.username === username) {
-        setTabCounts((c) => ({ ...c, replies: c.replies + 1 }));
+      if (isOwn) {
+        setTabCounts((c) => ({
+          ...c,
+          replies: c.replies + 1,
+          media: c.media + mediaItems.length,
+        }));
       }
     };
     const onReplyLike = (e: Event) => {

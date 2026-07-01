@@ -262,20 +262,75 @@ export function buildProfileReplyFromCreated(
   };
 }
 
+/** Медиа темы → элементы вкладки Media (те же поля, что отдаёт UserMediaView).
+ * Порядок разворачиваем (новейший файл — с большим pk — первым), чтобы после
+ * фактической перезагрузки с сервера порядок в сетке не «прыгал». */
+export function themeMediaTabItems(theme: Theme): MediaItem[] {
+  if (!theme.media || theme.media.length === 0) return [];
+  return [...theme.media].reverse().map((m) => ({
+    ...m,
+    key: `t${m.id}`,
+    source_type: "theme" as const,
+    theme_id: theme.id,
+    reply_id: null,
+  }));
+}
+
+/** Медиа ответа → элементы вкладки Media (аналогично UserMediaView, src='r'). */
+export function replyMediaTabItems(reply: Reply): MediaItem[] {
+  if (!reply.media || reply.media.length === 0) return [];
+  return [...reply.media].reverse().map((m) => ({
+    ...m,
+    key: `r${m.id}`,
+    source_type: "reply" as const,
+    theme_id: reply.theme_id,
+    reply_id: reply.id,
+  }));
+}
+
+/** Добавляет новые медиа в начало среза (дедуп по файлу), сохраняя новейшие сверху. */
+function withPrependedMedia(slice: ProfileSlice, items: MediaItem[]): ProfileSlice {
+  // Незагруженный срез не достраиваем — он подтянет свежее (с новыми файлами) сам.
+  if (items.length === 0 || !slice.loaded) return slice;
+  const seen = new Set<string>();
+  const media: MediaItem[] = [];
+  for (const m of [...items, ...slice.media]) {
+    const k = m.url || m.key || String(m.id);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    media.push(m);
+  }
+  if (media.length === slice.media.length) return slice;
+  return { ...slice, media };
+}
+
 export function prependThemeToProfileCache(theme: Theme) {
   const username = getStoredUsername();
   if (!username || theme.author.username !== username || !profileTabsCache) return;
   if (profileTabsCache.username !== username) return;
+  const mediaItems = themeMediaTabItems(theme);
   mapCachedSlices((slice, tab) => {
-    if (tab !== "themes") return slice;
-    // Незагруженный срез не «достраиваем» — он сам подтянет свежее при открытии.
-    if (!slice.loaded) return slice;
-    if (slice.themes.some((t) => t.id === theme.id)) return slice;
-    return {
-      ...slice,
-      themes: [theme, ...slice.themes],
-    };
+    if (tab === "themes") {
+      // Незагруженный срез не «достраиваем» — он сам подтянет свежее при открытии.
+      if (!slice.loaded) return slice;
+      if (slice.themes.some((t) => t.id === theme.id)) return slice;
+      return { ...slice, themes: [theme, ...slice.themes] };
+    }
+    if (tab === "media") return withPrependedMedia(slice, mediaItems);
+    return slice;
   });
+}
+
+/** Медиа своего нового ответа сразу в кэш вкладки Media (без ожидания перезагрузки). */
+export function prependReplyMediaToProfileCache(reply: Reply) {
+  const username = getStoredUsername();
+  if (!username || reply.author.username !== username || !profileTabsCache) return;
+  if (profileTabsCache.username !== username) return;
+  const items = replyMediaTabItems(reply);
+  if (items.length === 0) return;
+  mapCachedSlices((slice, tab) =>
+    tab === "media" ? withPrependedMedia(slice, items) : slice,
+  );
 }
 
 export function prependReplyToProfileCache(profileReply: ProfileReply) {

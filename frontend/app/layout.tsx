@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import BottomNav from "@/components/BottomNav";
 import I18nProvider from "@/components/I18nProvider";
 import MentionHoverLayer from "@/components/MentionHoverLayer";
@@ -30,19 +31,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var l=localStorage.getItem("mindset-locale");if(l!=="en"&&l!=="ru"&&l!=="uz")l="en";var e=document.documentElement;e.setAttribute("lang",l);e.setAttribute("dir","ltr");}catch(e){}})();`,
           }}
         />
-        {/* Font Awesome (kit) рисует иконки как SVG. По умолчанию он ЗАМЕНЯЕТ
-            <i> на <svg>, из-за чего React падает с removeChild при ремоунте
-            иконки (toggle лайка/пароля). Режим 'nest' вкладывает <svg> ВНУТРЬ
-            <i>, поэтому DOM-узел остаётся под контролем React. */}
+        {/* Конфиг FA до загрузки кита. Режим 'nest' вкладывает <svg> ВНУТРЬ <i>
+            (React владеет узлом — нет падения removeChild при ремоунте иконки),
+            observeMutations — чтобы новые/перемонтированные иконки дорисовывались. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `window.FontAwesomeConfig={autoReplaceSvg:"nest",observeMutations:true};`,
           }}
-        />
-        <script
-          src="https://kit.fontawesome.com/8e9347ccb1.js"
-          crossOrigin="anonymous"
-          async
         />
       </head>
       <body suppressHydrationWarning>
@@ -55,6 +50,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MentionHoverLayer />
           <BottomNav />
         </I18nProvider>
+        {/* Кит грузим ПОСЛЕ гидратации: до неё он мутировал <head> и <i>,
+            вызывая hydration mismatch. afterInteractive снимает конфликт с React. */}
+        <Script
+          src="https://kit.fontawesome.com/8e9347ccb1.js"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

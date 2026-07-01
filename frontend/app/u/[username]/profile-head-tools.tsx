@@ -54,6 +54,17 @@ export default function ProfileHeadTools({
 
   return (
     <div className="profile-head__tools" ref={rootRef}>
+      {showPlaneBtn && (
+        <button
+          type="button"
+          className="profile-head__tool-btn"
+          aria-label={t("shareProfile")}
+          title={t("shareProfile")}
+        >
+          <i className="fa-regular fa-paper-plane" aria-hidden="true" />
+        </button>
+      )}
+
       <div className="card-menu">
         <button
           type="button"
@@ -82,6 +93,17 @@ export default function ProfileHeadTools({
               <i className="fa-solid fa-link" aria-hidden="true" />
               {t("copyProfileLink")}
             </button>
+            {showPlaneBtn && (
+              <button
+                type="button"
+                className="card-menu__item"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+              >
+                <i className="fa-solid fa-gear" aria-hidden="true" />
+                {t("editProfile")}
+              </button>
+            )}
             {showBlockBtn && (
               <button
                 type="button"
@@ -96,17 +118,6 @@ export default function ProfileHeadTools({
           </div>
         )}
       </div>
-
-      {showPlaneBtn && (
-        <button
-          type="button"
-          className="profile-head__tool-btn"
-          aria-label={t("shareProfile")}
-          title={t("shareProfile")}
-        >
-          <i className="fa-regular fa-paper-plane" aria-hidden="true" />
-        </button>
-      )}
 
       {copiedToast && (
         <div className="copy-overlay" role="status">
